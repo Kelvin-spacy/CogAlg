@@ -159,23 +159,30 @@ def form_PPm(dert_P_):  # cluster dert_Ps into PPm s by mP sign, eval for div_co
 
     PPm_ = []
     dert_P = dert_P_[0]  # initialize PPm with first dert_P (positive PPms only, no contrast: miss over discontinuity is expected):
-
+    dert_P_obj = object
     _smP, MP, Neg_M, Neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
     dert_P.smP, dert_P.MP, dert_P.Neg_M, dert_P.Neg_L, dert_P.P, dert_P.ML, dert_P.DL, dert_P.MI, dert_P.DI, dert_P.MD, dert_P.DD, dert_P.MM, dert_P.DM
     P_ = [_P]
+    dert_P_obj = CPP(smP=_smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM)
 
     for i, dert_P in enumerate(dert_P_, start=1):
         smP = dert_P.smP
         if smP != _smP:
             # terminate PPm:
-            PPm_.append(CPP(smP=smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM))
+            dert_P_obj.smP=smP
+            
+            PPm_.append(dert_P_obj)
             # initialize PPm with current dert_P:
             _smP, MP, Neg_M, Neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
             dert_P.smP, dert_P.MP, dert_P.Neg_M, dert_P.Neg_L, dert_P.P, dert_P.ML, dert_P.DL, dert_P.MI, dert_P.DI, dert_P.MD, dert_P.DD, dert_P.MM, dert_P.DM
             P_ = [_P]
+            dert_P_obj = CPP(smP=smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM)
         else:
+            dert_P_obj.accumulate(**{param:getattr(dert_P_obj, param) for param in dert_P_obj.numeric_params})
+            P_.append(dert_P.P)
+            dert_P_obj.P_ = P_
             # accumulate PPm with current dert_P:
-            MP += dert_P.MP
+        ''' MP += dert_P.MP
             Neg_M += dert_P.Neg_M
             Neg_L += dert_P.Neg_L
             ML += dert_P.ML
@@ -185,8 +192,9 @@ def form_PPm(dert_P_):  # cluster dert_Ps into PPm s by mP sign, eval for div_co
             MD += dert_P.MD
             DD += dert_P.DD
             MM += dert_P.MM
-            DM += dert_P.DM
-            P_.append(dert_P.P)
+            DM += dert_P.DM'''
+            
+            
         _smP = smP
     # pack last PP:
     PPm_.append(CPP(smP=_smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM))
