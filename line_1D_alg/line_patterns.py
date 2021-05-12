@@ -29,20 +29,21 @@ from itertools import zip_longest
 from class_cluster import ClusterStructure, NoneType
 
 class Cdert(ClusterStructure):
-    p = int
-    d = int
-    m = int
+    p = int    #pixel
+    d = int    #difference
+    m = int    #match
 
 class CP(ClusterStructure):
     sign = NoneType
-    L = int
-    I = int
-    D = int
-    M = int
+    L = int   #Length?
+    I = int   #?
+    D = int   #Accumulated D for forming mP
+    M = int   #Accumulated M for forming match
     dert_ = list
     sub_layers = list
-    smP = NoneType
+    smP = NoneType    #sign match patterns - positive match pattern
     fdert = NoneType
+
 
 # pattern filters or hyper-parameters: eventually from higher-level feedback, initialized here as constants:
 

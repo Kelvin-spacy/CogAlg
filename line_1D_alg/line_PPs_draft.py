@@ -29,11 +29,11 @@ from line_patterns import *
 from class_cluster import ClusterStructure, NoneType
 
 class Cdert_P(ClusterStructure):
-    smP = NoneType
-    MP = int
+    smP = NoneType   #sign matched patters - positive sign patterns
+    MP = int         #Higher lever Matched Patterns
     Neg_M = int
     Neg_L = int
-    P = list
+    P = list         # Patterns from line_patterns
     ML = int
     DL = int
     MI = int
@@ -44,8 +44,8 @@ class Cdert_P(ClusterStructure):
     DM = int
 
 class CPP(ClusterStructure):
-    smP = NoneType
-    MP = int
+    smP = NoneType   #sign matched patters - positive sign patterns
+    MP = int         #Higher lever Matched Patterns
     Neg_M = int
     Neg_L = int
     P_ = list
