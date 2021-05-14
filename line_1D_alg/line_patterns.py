@@ -36,7 +36,7 @@ class Cdert(ClusterStructure):
 class CP(ClusterStructure):
     sign = NoneType
     L = int   #Length?
-    I = int   #?
+    I = int   #Intensity
     D = int   #Accumulated D for forming mP
     M = int   #Accumulated M for forming match
     dert_ = list

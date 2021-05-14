@@ -158,31 +158,38 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
 def form_PPm(dert_P_):  # cluster dert_Ps into PPm s by mP sign, eval for div_comp per PPm
 
     PPm_ = []
-    dert_P = dert_P_[0]  # initialize PPm with first dert_P (positive PPms only, no contrast: miss over discontinuity is expected):
-    _smP = dert_P.smP
-    _P = dert_P.P
-    P_ = [_P]
+    #dert_P = dert_P_[0]  # initialize PPm with first dert_P (positive PPms only, no contrast: miss over discontinuity is expected):
+    _derP = object
 
-    for i, dert_P in enumerate(dert_P_, start=1):
+    for i, dert_P in enumerate(dert_P_):
+        if i == 0:
+            _smP = dert_P.smP
+            _P = dert_P.P
+            P_ = [_P]
+            _derP = dert_P     # Current dert_P becomes previous derP i-e _derP
+            continue           
+
         smP = dert_P.smP
         if smP != _smP:
             # terminate PPm:
-            dert_P.smP = smP
-            dert_P.P = P_
-            PPm_.append(dert_P)
+            _derP.smP = smP     # previous _derP.smp equals current smp
+            _derP.P = P_        # previous _derP.P equals P_ array
+            PPm_.append(_derP)  #append previous _derP (accumulated)
             # initialize PPm with current dert_P:
             _smP = dert_P.smP  # Current smP becomes Previous smP i-e _smP
             _P = dert_P.P      #Current P becomes previous P i-e _P
             P_ = [_P]
+            _derP = dert_P     #Current dert_P becomes previous _derP
         else:
-            dert_P.accumulate(**{param:getattr(dert_P, param) for param in dert_P.numeric_params})
+            _derP.accumulate(**{param:getattr(dert_P, param) for param in _derP.numeric_params}) # accum previous _derP
             P_.append(dert_P.P)
+            #_derP = dert_P      #Current dert_P becomes previous _derP
             
             
         _smP = smP
-    dert_P.smP = _smP
-    dert_P.P = P_
-    PPm_.append(dert_P)
+    _derP.smP = _smP
+    _derP.P = P_
+    PPm_.append(_derP)
 
     return PPm_
 
