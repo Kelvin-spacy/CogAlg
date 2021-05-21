@@ -52,6 +52,7 @@ class CPP(ClusterStructure):
     DD = int
     MM = int
     DM = int
+    sub_layers = list
 
 ave = 100  # ave dI -> mI, * coef / var type
 '''
@@ -154,7 +155,7 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
 
     PPm_ = []
     derP = derP_[0]  # initialize PPm with first derP (positive PPms only, no contrast: miss over discontinuity is expected):
-
+    sub_layers = []
     _smP, MP, Neg_M, Neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
     derP.smP, derP.MP, derP.Neg_M, derP.Neg_L, derP.P, derP.ML, derP.DL, derP.MI, derP.DI, derP.MD, derP.DD, derP.MM, derP.DM
     P_ = [_P]
@@ -163,7 +164,7 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
         smP = derP.smP
         if smP != _smP:
             # terminate PPm:
-            PPm_.append(CPP(smP=smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM))
+            PPm_.append(CPP(smP=smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM, sub_layers=sub_layers))
             # initialize PPm with current derP:
             _smP, MP, Neg_M, Neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
             derP.smP, derP.MP, derP.Neg_M, derP.Neg_L, derP.P, derP.ML, derP.DL, derP.MI, derP.DI, derP.MD, derP.DD, derP.MM, derP.DM
@@ -184,9 +185,48 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
             P_.append(derP.P)
         _smP = smP
     # pack last PP:
-    PPm_.append(CPP(smP=_smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM))
+    PPm_.append(CPP(smP=_smP, MP=MP, Neg_M=Neg_M, Neg_L=Neg_L, P_=P_, ML=ML, DL=DL,MI=MI, DI=DI, MD=MD, DD=DD, MM=MM, DM=DM, sub_layers=sub_layers))
+    P_l = [len(P.P_) for P in PPm_]
+    ave_PPm_P = sum(P_l)/len(P_l)
+    if len(PPm_.P_) > ave_PPm_P:
+        intra_PPm(PPm_,fid=False, rdn=1, rng=3)
 
     return PPm_
+
+
+def intra_PPm(PPm_,fid,rdn,rng):
+    comb_layers = []
+    rdert_ = []
+    sub_PPm_ = []
+    
+    for P in PPm_:
+        if P.smP:
+            rdert_ = range_comp(P.P_)
+            sub_PPm_ = form_PPm(rdert)
+            Ls = len(sub_PPm_)
+            P.sub_layers += [[(Ls, fid, rdn, rng, sub_PPm_)]]
+            if len(sub_PPm_) > ave_PPm_P:
+                P.sub_layers += intra_PPm_(sub_PPm_, fid, rdn + 1 + 1 / Ls, rng * 2 + 1)
+                comb_layers = [comb_layers + sub_layers for comb_layers, sub_layers in
+                               zip_longest(comb_layers, P.sub_layers, fillvalue=[])]
+
+
+
+
+
+def range_comp(P_):
+    rdert_ = []
+    for n in range(0,len(P_)):
+        rdert.append(comp_P_(P_[n]))
+
+    return rdert
+
+            
+
+
+
+
+
 
 ''' 
     Each PP is evaluated for intra-processing, not per P: results must be comparable between consecutive Ps): 
@@ -199,6 +239,9 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
     
     L is summed sign: val = S val, core ! comb?  
 '''
+
+
+
 
 def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division between element Ps
     '''
