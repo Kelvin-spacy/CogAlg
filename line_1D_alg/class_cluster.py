@@ -11,9 +11,13 @@ differences in interfaces are mostly eliminated.
 
 import weakref
 from numbers import Number
+from inspect import isclass
+from cmath import phase
 
 NoneType = type(None)
 
+# ----------------------------------------------------------------------------
+# Template for class method generation
 _methods_template = '''
 @property
 def id(self):
@@ -38,6 +42,8 @@ def __repr__(self):
     return "{typename}({repr_fmt})" % ({numeric_param_vals})
 '''
 
+# ----------------------------------------------------------------------------
+# MetaCluster meta-class
 class MetaCluster(type):
     """
     Serve as a factory for creating new cluster classes.
@@ -45,15 +51,24 @@ class MetaCluster(type):
     def __new__(mcs, typename, bases, attrs):  # called right before a new class is created
         # get fields/params and numeric params
 
-        # params = tuple(attr for attr in attrs if not callable(attr))  # callable: _id, hid and weakref (see attrs['slots']
+        # inherit params
+        for base in bases:
+            if issubclass(base, ClusterStructure):
+                for key in base.__dict__:
+                    if key[-5:] == "_type":
+                        param = key[:-5]
+                        if param not in attrs:
+                            attrs[param] = list
 
-        # only ignore param name start with double underscore
+        # only ignore param names start with double underscore
         params = tuple(attr for attr in attrs
-                   if not attr.startswith('__')
-                   and not callable(attr))
+                       if not attr.startswith('__') and
+                       isclass(attrs[attr]))
 
         numeric_params = tuple(param for param in params
-                               if (issubclass(attrs[param], Number)) and not (issubclass(attrs[param], bool)) ) # avoid accumulate bool, which is flag
+                               if (issubclass(attrs[param], Number)) and
+                               not (issubclass(attrs[param], bool))) # avoid accumulate bool, which is flag
+
         # Fill in the template
         methods_definitions = _methods_template.format(
             typename=typename,
@@ -129,9 +144,11 @@ class MetaCluster(type):
         return len(cls._instances)
 
 
+# ----------------------------------------------------------------------------
+# ClusterStructure class
 class ClusterStructure(metaclass=MetaCluster):
     """
-    Base class for cluster objects in 2D implementation of CogAlg.
+    Class for cluster objects in 2D implementation of CogAlg.
     Each time a new instance is created, four things are done:
     - Set initialize field/param.
     - Set id.
@@ -142,8 +159,8 @@ class ClusterStructure(metaclass=MetaCluster):
     - Set higher cluster id to None (no higher cluster structure yet)
     Examples
     --------
-    >>> from frame_class import Cluster
-    >>> class CP(Cluster):
+    >>> from class_cluster import ClusterStructure
+    >>> class CP(ClusterStructure):
     >>>     L = int  # field/param name and default type
     >>>     I = int
     >>>
@@ -161,6 +178,14 @@ class ClusterStructure(metaclass=MetaCluster):
     >>> P2.L += 1; P2.I += 10  # assignment, fields are mutable
     >>> print(P2)
     CP(L=1, I=10)
+    >>> # Accumulate using accumulate()
+    >>> P1.accumulate(L=1, I=2)
+    >>> print(P1)
+    CP(L=2, I=7)
+    >>> # ... or accum_from()
+    >>> P2.accum_from(P1)
+    >>> print(P2)
+    CP(L=3, I=17)
     >>> # field/param types are not constrained, so be careful!
     >>> P2.L = 'something'
     >>> print(P2)
@@ -169,6 +194,34 @@ class ClusterStructure(metaclass=MetaCluster):
 
     def __init__(self, **kwargs):
         pass
+
+    def accum_from(self, other, excluded=()):
+        """Accumulate params from another structure."""
+        self.accumulate(**{param: getattr(other, p, 0)
+                           for param in self.numeric_params
+                           if param not in excluded})
+
+    def difference(self, other, excluded=()):
+        return {param:(getattr(self, param) - getattr(other, param))
+                for param in self.numeric_params if param not in excluded}
+
+    '''
+    It should be generic min_match, no two separate versions:
+    if self_param>0 == other_param>0:
+        return {param: min(abs(getattr(self, param)), abs(getattr(other, param)))
+                for param in self.numeric_params if param not in excluded}
+    else:
+        return negative param ( one of comparands is always negative here, it should become min_match )
+    How do we put it in code?
+    '''
+    def min_match(self, other, excluded=()):
+
+        return {param: min(getattr(self, param), getattr(other, param))
+                for param in self.numeric_params if param not in excluded}
+    def abs_min_match(self, other, excluded=()):
+        return {param: min(abs(getattr(self, param)), abs(getattr(other, param)))
+                for param in self.numeric_params if param not in excluded}
+
 
 if __name__ == "__main__":  # for debugging
     from sys import getsizeof as size
