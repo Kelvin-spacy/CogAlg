@@ -23,29 +23,24 @@ import numpy as np
 from line_patterns import *
 from class_cluster import ClusterStructure, NoneType
 
-class CderP(ClusterStructure):
-    Dert = object
+class CderP(CP):
     smP = NoneType
     P = object
-
-class Cint(ClusterStructure):
-    ML = int
-    DL = int
-    MI = int
-    DI = int
-    MD = int
-    DD = int
-    MM = int
-    DM = int
-    MP = int
     Neg_M = int
     Neg_L = int
+    smP = NoneType
+
 
 class CPP(ClusterStructure):
-    Dert = object
+    L = list
+    I = list
+    D = list
+    M = list
     smP = NoneType
     P_ = list
     sub_layers = list
+    Neg_M = int
+    Neg_L = int
 
 ave = 100  # ave dI -> mI, * coef / var type
 '''
@@ -62,12 +57,12 @@ def comp_P_(P_):  # cross-compare patterns within horizontal line
 
     for i, P in enumerate(P_):
         neg_M = vmP = smP = _smP = neg_L = 0  # initialization
-        M = P.Dert.M
+        M = P.M
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
             if M - neg_M > ave_M:  # search while net_M > ave or 1st _P, no selection by M sign
 
                 derP, _L, _smP = comp_P(P, _P, neg_M, neg_L)
-                smP, vmP, neg_M, neg_L, P = derP.smP, derP.Dert.MP, derP.Dert.Neg_M, derP.Dert.Neg_L, derP.P
+                smP, vmP, neg_M, neg_L, P = derP.smP, derP.MP, derP.Neg_M, derP.Neg_L, derP.P
                 if smP:
                     P_[i + 1 + j].smP = True  # backward match per P: __smP = True
                     derP_.append(derP)
@@ -77,12 +72,12 @@ def comp_P_(P_):  # cross-compare patterns within horizontal line
                     neg_L += _L   # accumulate distance to match
                     if j == len(P_):
                         # last P is a singleton derP, derivatives are ignored:
-                        derP_.append(CderP(Dert=Cint(MP=vmP, Neg_M=neg_M, Neg_L=neg_L),smP=smP or _smP, P=P ))
+                        derP_.append(CderP(MP=vmP, Neg_M=neg_M, Neg_L=neg_L,smP=smP or _smP, P=P ))
                     '''                     
                     no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
-                derP_.append(CderP(Dert=Cint(MP=vmP, Neg_M=neg_M, Neg_L=neg_L),smP=smP or _smP, P=P))
+                derP_.append(CderP(MP=vmP, Neg_M=neg_M, Neg_L=neg_L,smP=smP or _smP, P=P))
                 # smP is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
@@ -93,25 +88,32 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
 
     #sign, L, I, D, M, dert_, sub_H, _smP = P.sign, P.L, P.I, P.D, P.M, P.dert_, P.sub_layers, P.smP
     #_sign, _L, _I, _D, _M, _dert_, _sub_H, __smP = _P.sign, _P.L, _P.I, _P.D, _P.M, _P.dert_, _P.sub_layers, _P.smP
+    derP = CderP()
     sign, L, _smP= P.sign, P.L, P.smP
     _sign, _L = _P.sign, P.L
     dC_ave = ave_M * ave_rM ** (1 + neg_L / L)  # average match projected at current distance: neg_L, add coef / var?
     # if param fderived: m = min(var,_var) - dC_ave,
     # else:              m = dC_ave - abs(d_var), always a deviation:
-
-    dI = P.Dert.I - _P.Dert.I  # proportional to distance, not I?
-    mI = dC_ave - abs(dI)  # I is not derived: match is inverse deviation of miss
-    dL = L - _L
-    mL = min(L, _L) - dC_ave  # positions / sign, derived, magnitude-proportional value
-    dD = P.Dert.D - _P.Dert.D     # sum if opposite-sign
-    mD = min(P.Dert.D, _P.Dert.D) - dC_ave  # same-sign D in Pd?
-    dM = P.Dert.M - _P.Dert.M     # sum if opposite-sign
-    mM = min(P.Dert.M, _P.Dert.M) - dC_ave  # negative if x-sign, M += adj_M + deep_M: P value before layer value?
-
-    mP = mI + mL + mM + mD  # match(P, _P), no I: overlap, for regression to 0der-representation?
+    # append base param at index 0
+    derP.L.append(P.L)
+    derP.I.append(P.I)
+    derP.M.append(P.M)
+    derP.D.append(P.D)
+    
+    derP.L.append(min(L, _L) - dC_ave) #->mL  positions / sign, derived, magnitude-proportional value
+    derP.L.append(L-_L) #->dL
+    derP.I.append(dC_ave - abs(dI))  #->mI I is not derived: match is inverse deviation of miss
+    derP.I.append(P.I - _P.I)  #->dI proportional to distance, not I?
+    derP.M.append(min(P.M, _P.M) - dC_ave) #mM negative if x-sign, M += adj_M + deep_M: P value before layer value?
+    derP.M.append(P.M - _P.M) # dM sum if opposite-sign
+    derP.D.append(min(P.D, _P.D) - dC_ave) #mD same-sign D in Pd?
+    derP.D.append(P.D - _P.D) #dD sum if opposite-sign
+    
+    derP.mP = derP.I[1] + derP.L[1]  + derP.M[1] + derP.D[1]  # match(P, _P), no I: overlap, for regression to 0der-representation?
     if sign == _sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
 
-    smP = mP > 0
+    smP = derP.M[1] > 0
+    
     if smP:  # positive forward match, compare sub_layers between P.sub_H and _P.sub_H:
         dert_sub_H = []  # sub hierarchy, abbreviation for new sub_layers
 
@@ -129,7 +131,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
                         for sub_P in sub_P_:  # note name recycling in nested loop
                             for _sub_P in _sub_P_:
                                 dert_sub_P, _, _ = comp_P(sub_P, _sub_P, neg_M=0, neg_L=0)  # ignore _sub_L, _sub_smP?
-                                sub_MP += dert_sub_P.Dert.MP  # sum sub_vmPs in derP_layer
+                                sub_MP += dert_sub_P.MP  # sum sub_vmPs in derP_layer
                                 dert_sub_P_.append(dert_sub_P)
 
                         dert_sub_H.append((fdP, fid, rdn, rng, dert_sub_P_))  # add only layers that have been compared
@@ -139,9 +141,10 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
                             break  # low vertical induction, deeper sub_layers are not compared
                     else:
                         break  # deeper P and _P sub_layers are from different intra_comp forks, not comparable?
-
-    derP = CderP(Dert=Cint(MP=mP, Neg_M=neg_M, Neg_L=neg_L,  ML=mL, DL=dL, MI=mI, DI=dI, MD=mD, DD=dD, MM=mM, DM=dM), smP=smP,P=P)
-
+    derP.smP = smP
+    derP.P = P
+    derP.Neg_M = neg_M
+    derP.Neg_L = neg_L
     return derP, _L, _smP
 
 
@@ -151,35 +154,47 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
     sub_layers = []
     #_smP, MP, Neg_M, Neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
     #derP.smP, derP.MP, derP.Neg_M, derP.Neg_L, derP.P, derP.ML, derP.DL, derP.MI, derP.DI, derP.MD, derP.DD, derP.MM, derP.DM
-    _Dert = object
+    
 
     for i, derP in enumerate(derP_, start=1):
         if i == 0:
             _smP = derP.smP
             _P = derP.P
             P_ = [_P]
-            _Dert = derP.Dert     
+            L, I, D, M, mP, neg_L, neg_M = derP.L, derP.I, derP.D, derP.M, derP.mP, derP.Neg_L, derP.Neg_M
+
             continue   
         smP = derP.smP
         if smP != _smP:
             # terminate PPm:
             _derP.smP = smP     # previous _derP.smp equals current smp
             _derP.P = P_        # previous _derP.P equals P_ array
-            PPm_.append(CPP(Dert = _Dert,smP=smP,P_=P_, sub_layers=sub_layers))
+            PPm_.append(CPP(L=L, I=I, D=D, M=M, mP=mP, Neg_M=net_M, Neg_L=neg_L, smP=smP, P_=P_, sub_layers=sub_layers))
             # initialize PPm with current derP:
+
             #_smP, MP, Neg_M, Neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
             #derP.smP, derP.MP, derP.Neg_M, derP.Neg_L, derP.P, derP.ML, derP.DL, derP.MI, derP.DI, derP.MD, derP.DD, derP.MM, derP.DM
             _smP = dert_P.smP  # Current smP becomes Previous smP i-e _smP
             _P = derP.P      #Current P becomes previous P i-e _P
             P_ = [_P]
-            _Dert = derP.Dert
+            L, I, D, M, mP, neg_L, neg_M = derP.L, derP.I, derP.D, derP.M, derP.mP, derP.Neg_L, derP.Neg_M
         else:
             # accumulate PPm with current derP:
-            _Dert.accumulate(**{param:getattr(derP.Dert, param) for param in _Dert.numeric_params}) # accum previous _derP
+            mP += derP.mP
+            neg_M += derP.neg_M
+            neg_L += derP.neg_L
+            L[1] += derP.L[1]
+            L[2] += derP.L[2]
+            I[1] += derP.I[1]
+            I[2] += derP.I[2]
+            D[1] += derP.D[1]
+            D[2] += derP.D[2]
+            M[1] += derP.M[1]
+            M[2] += derP.M[2]
             P_.append(derP.P)
         _smP = smP
     # pack last PP:
-    PPm_.append(CPP(Dert = _Dert, smP=_smP, P_=P_,sub_layers=sub_layers))
+    PPm_.append(CPP(L=L, I=I, D=D, M=M, mP=mP, Neg_M=net_M, Neg_L=neg_L, smP=smP, P_=P_, sub_layers=sub_layers))
     #P_l = [len(P.P_) for P in PPm_]
     #ave_PPm_P = sum(P_l)/len(P_l)
     if len(PPm_.P_) > 8:
