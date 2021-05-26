@@ -57,32 +57,7 @@ init_y = 0  # starting row, the whole frame doesn't need to be processed
     prefix 'f' denotes binary flag
     capitalized variables are normally summed same-letter small-case variables
 '''
-def extend(param,ext=[]):
-    if ext:
-        values = {}
-        for i,x in enumerate(ext):
-            if i == 0:
-                values[x] = param
-                continue
-            values[x] = None
-    else:
-        values = []
-        values.append(param)
-    return values
 
-    '''
-    P.L=val1
-    if provided with extensions
-    P.L = extend(P.L,['L','mL','dL'])
-    P.L = {'L':val1,'mL':val2,'dL':val3}
-    P.L['L'] = val1
-
-    else
-    P.L = extend(P.L)
-    P.L = [val1]
-
-
-    '''
 
 def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patterns, each pattern maybe nested
 

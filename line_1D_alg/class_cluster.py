@@ -195,11 +195,24 @@ class ClusterStructure(metaclass=MetaCluster):
     def __init__(self, **kwargs):
         pass
 
+    def extend(self,excluded=()):
+        return {param: setattr(self, param, [getattr(self,param)]) 
+                for param in self.numeric_params
+               if param not in excluded}
+
+    '''
+    def exend(self,param,excluded=())
+    return type casted params from int to list with excluded params
+
+    Pm_=CP(L=2,I=2,D=3,M=4)
+    Pm_.extend(excluded('I')) ->CP(L=[2],I=2,D=[3],M=[4])
     
+
+    '''
 
     def accum_from(self, other, excluded=()):
         """Accumulate params from another structure."""
-        self.accumulate(**{param: getattr(other, param, 0)
+        self.accumulate(**{param: getattr(other, p, 0)
                            for param in self.numeric_params
                            if param not in excluded})
 
