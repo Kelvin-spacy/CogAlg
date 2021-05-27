@@ -1,5 +1,6 @@
+  
 """
-Provide a base class for cluster objects in 2D implementation of CogAlg.
+Provide a base class for cluster objects in CogAlg.
 Features:
 - Unique instance ids per class.
 - Instances are retrievable by ids via class.
@@ -12,7 +13,6 @@ differences in interfaces are mostly eliminated.
 import weakref
 from numbers import Number
 from inspect import isclass
-from cmath import phase
 
 NoneType = type(None)
 
@@ -54,11 +54,9 @@ class MetaCluster(type):
         # inherit params
         for base in bases:
             if issubclass(base, ClusterStructure):
-                for key in base.__dict__:
-                    if key[-5:] == "_type":
-                        param = key[:-5]
-                        if param not in attrs:
-                            attrs[param] = list
+                for param in base.numeric_params:
+                    if param not in attrs:
+                        attrs[param] = CParamDer
 
         # only ignore param names start with double underscore
         params = tuple(attr for attr in attrs
@@ -68,6 +66,12 @@ class MetaCluster(type):
         numeric_params = tuple(param for param in params
                                if (issubclass(attrs[param], Number)) and
                                not (issubclass(attrs[param], bool))) # avoid accumulate bool, which is flag
+        list_params = tuple(param for param in params
+                               if (issubclass(attrs[param], list)) and
+                               not (issubclass(attrs[param], bool)) and
+                               not (issubclass(attrs[param], int)) and
+                               not (issubclass(attrs[param],NoneType))) # avoid accumulate bool, which is flag
+
 
         # Fill in the template
         methods_definitions = _methods_template.format(
@@ -77,6 +81,8 @@ class MetaCluster(type):
                                  for param in params),
             numeric_param_vals=', '.join(f'self.{param}'
                                          for param in numeric_params),
+            list_param_vals=', '.join(f'self.{param}'
+                                         for param in list_params),
             pack_args=', '.join(param for param in ('', *params)),
             pack_assignments='; '.join(f'self.{param} = {param}'
                                   for param in params)
@@ -102,6 +108,7 @@ class MetaCluster(type):
             attrs[param + '_type'] = attrs.pop(param)
         # attrs['params'] = params
         attrs['numeric_params'] = numeric_params
+        attrs['list_params'] = list_params
 
         # Add fields/params and other instance attributes
         attrs['__slots__'] = (('_id', 'hid', *params, '__weakref__')
@@ -194,50 +201,59 @@ class ClusterStructure(metaclass=MetaCluster):
 
     def __init__(self, **kwargs):
         pass
+    def accum_list(self,other,excluded=()):
+        return {param:list(map(add,(getattr(self,param)),(getattr(other,param)))) 
+               for param in self.list_params
+                   if param not in excluded}
 
-    def extend(self,excluded=()):
-        return {param: setattr(self, param, [getattr(self,param)]) 
-                for param in self.numeric_params
-               if param not in excluded}
-
-    '''
-    def exend(self,param,excluded=())
-    return type casted params from int to list with excluded params
-
-    Pm_=CP(L=2,I=2,D=3,M=4)
-    Pm_.extend(excluded('I')) ->CP(L=[2],I=2,D=[3],M=[4])
-    
-
-    '''
 
     def accum_from(self, other, excluded=()):
         """Accumulate params from another structure."""
-        self.accumulate(**{param: getattr(other, p, 0)
+        self.accumulate(**{param: getattr(other, param, 0)
                            for param in self.numeric_params
                            if param not in excluded})
 
-    def difference(self, other, excluded=()):
-        return {param:(getattr(self, param) - getattr(other, param))
-                for param in self.numeric_params if param not in excluded}
+    def compare(self, other, ave, excluded=()):
+        # Get the subclass (inheritted class) and init a new instance
+        der = self.__class__.__subclasses__()[0]()
+        for param in self.numeric_params:
+            if param not in excluded:
+                i = getattr(self, param)
+                d = i - getattr(other, param)
+                m = abs(d) - ave
 
-    '''
-    It should be generic min_match, no two separate versions:
-    if self_param>0 == other_param>0:
-        return {param: min(abs(getattr(self, param)), abs(getattr(other, param)))
-                for param in self.numeric_params if param not in excluded}
-    else:
-        return negative param ( one of comparands is always negative here, it should become min_match )
-    How do we put it in code?
-    '''
-    def min_match(self, other, excluded=()):
+                # assign to der
+                setattr(der, param, CParamDer(i, d, m))
 
-        return {param: min(getattr(self, param), getattr(other, param))
-                for param in self.numeric_params if param not in excluded}
-    def abs_min_match(self, other, excluded=()):
-        return {param: min(abs(getattr(self, param)), abs(getattr(other, param)))
-                for param in self.numeric_params if param not in excluded}
+        return der
 
 
-if __name__ == "__main__":  # for debugging
-    from sys import getsizeof as size
-    size(ClusterStructure)
+# ----------------------------------------------------------------------------
+# CSingleDer class
+class CParamDer(Number):
+    __slots__ = ('I', 'D', 'M')
+    def __init__(self, I=0, M=0, D=0):
+        self.I = I
+        self.M = M
+        self.D = D
+
+    def __add__(self, other):
+        return CDer(self.I + other.I, self.D + other.D, self.M + other.M)
+
+    def __sub__(self, other):
+        return CDer(self.I - other.I, self.D - other.D, self.M - other.M)
+
+    def __repr__(self):
+        return "(I={}, D={}, M={})".format(self.I, self.D, self.M)
+
+if __name__ == "__main__":  # for tests
+    class CTest(ClusterStructure):
+        x = int
+        y = int
+
+    class CTestSub(CTest):
+        pass
+
+    b = CTest(x=5, y=7)
+    c = CTest(x=2, y=3)
+    print(b.compare(c, ave=1))  # automatically return the inherited class (it is assumed to contain ders)
