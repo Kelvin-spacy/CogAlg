@@ -13,7 +13,7 @@ differences in interfaces are mostly eliminated.
 import weakref
 from numbers import Number
 from inspect import isclass
-
+from operator import add
 NoneType = type(None)
 
 # ----------------------------------------------------------------------------
