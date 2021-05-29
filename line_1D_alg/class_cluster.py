@@ -56,7 +56,7 @@ class MetaCluster(type):
             if issubclass(base, ClusterStructure):
                 for param in base.numeric_params:
                     if param not in attrs:
-                        attrs[param] = CParamDer
+                        attrs[param] = Cdert
 
         # only ignore param names start with double underscore
         params = tuple(attr for attr in attrs
@@ -213,47 +213,93 @@ class ClusterStructure(metaclass=MetaCluster):
                            for param in self.numeric_params
                            if param not in excluded})
 
-    def compare(self, other, ave, excluded=()):
-        # Get the subclass (inheritted class) and init a new instance
-        der = self.__class__.__subclasses__()[0]()
+    def comp_param(self, other, ave, excluded=()):
+        # Get the subclass (inherited class) and init a new instance
+        dert = self.__class__.__subclasses__()[0]()
+
+        excluded += ('Dy', 'Dx', 'Day', 'Dax') # always exclude dy and dx related components
+
         for param in self.numeric_params:
-            if param not in excluded:
-                i = getattr(self, param)
-                d = i - getattr(other, param)
-                m = abs(d) - ave
+            if param not in excluded and param in other.numeric_params:
+                p = getattr(self, param)
+                _p = getattr(other, param)
+                d = p - _p  # difference
+                if param == 'I':
+                    m = ave - abs(d)  # indirect match
+                else:
+                    m = min(p,_p) - abs(d)/2 - ave  # direct match
+                # assign to dert:
+                setattr(dert, param, Cdert(p, d, m))
 
-                # assign to der
-                setattr(der, param, CParamDer(i, d, m))
+        if 'Dy' in self.numeric_params and 'Dy' in other.numeric_params:
+            dy = getattr(self, 'Dy'); _dy = getattr(other, 'Dy')
+            dx = getattr(self, 'Dx'); _dx = getattr(other, 'Dx')
+            a =  dx + 1j * dy; _a = _dx + 1j * _dy # angle in complex form
+            da = a * _a.conjugate()                # angle difference
+            ma = ave - abs(da)                     # match
+            setattr(dert, 'Vector', Cdert(a, da, ma))
 
-        return der
+        if 'Day' in self.numeric_params and 'Day' in other.numeric_params:
+            day = getattr(self, 'Day'); _day = getattr(other, 'Day')
+            dax = getattr(self, 'Dax'); _dax = getattr(other, 'Dax')
 
+            dday = day * _day.conjugate() # angle difference of complex day
+            ddax = dax * _dax.conjugate() # angle difference of complex dax
+            # formula for sum of angles, ~ angle_diff:
+            # daz = (cos_1*cos_2 - sin_1*sin_2) + j*(cos_1*sin_2 + sin_1*cos_2)
+            #     = (cos_1 + j*sin_1)*(cos_2 + j*sin_2)
+            #     = az1 * az2
+            dda = dday * ddax   # sum of angle difference
+            mda = ave - abs(dda) # match
+            setattr(dert, 'aVector', Cdert((day, dax), dda, mda))
+
+        return dert
 
 # ----------------------------------------------------------------------------
-# CSingleDer class
-class CParamDer(Number):
-    __slots__ = ('I', 'D', 'M')
-    def __init__(self, I=0, M=0, D=0):
-        self.I = I
-        self.M = M
-        self.D = D
 
-    def __add__(self, other):
-        return CDer(self.I + other.I, self.D + other.D, self.M + other.M)
+class Cdert(Number):
+    __slots__ = ('p', 'd', 'm')
+    def __init__(self, p=0, d=0, m=0):
+        self.p, self.d, self.m = p, d, m
 
-    def __sub__(self, other):
-        return CDer(self.I - other.I, self.D - other.D, self.M - other.M)
+    def accum(self, other):
+
+        return Cdert(self.p + other.p, self.d + other.d, self.m + other.m)
+
+    def comp_dert(self, other, ave):  # adds a level of nesting to self dert
+
+        p = self.comp_dert_fcn(self.m, other.m, ave)
+        m = self.comp_dert_fcn(self.m, other.m, ave)
+        d = self.comp_dert_fcn(self.d, other.d, ave)
+        
+        return Cdert(p, m, d)
+
+
+    def comp_dert_fcn(self, param, _param, ave):
+        
+        d = param - _param
+        if param == self.p and (self == 'I' or self == 'Vector' or self == 'aVector'):
+            m = ave - abs(d)
+        else:
+            m = min(param, _param) - abs(d)/2 - ave
+            
+        return Cdert(param, d, m)
 
     def __repr__(self):
-        return "(I={}, D={}, M={})".format(self.I, self.D, self.M)
+        return "(p={}, d={}, m={})".format(self.p, self.d, self.m)
 
 if __name__ == "__main__":  # for tests
-    class CTest(ClusterStructure):
-        x = int
-        y = int
+    class CP(ClusterStructure):
+        L = int
+        D = int
+        I = int
+        M = int
 
-    class CTestSub(CTest):
+    class CderP(CP):
         pass
 
-    b = CTest(x=5, y=7)
-    c = CTest(x=2, y=3)
-    print(b.compare(c, ave=1))  # automatically return the inherited class (it is assumed to contain ders)
+    _b = CP(L=1,D=2,I=5,M=9)
+    c = CP(L=4,D=5,I=7,M=7)
+    derP = _b.comp_param(c, ave=15)  # automatically return the inherited class (it is assumed to contain ders)
+    print(derP.L.d)
+    #print(b.y)

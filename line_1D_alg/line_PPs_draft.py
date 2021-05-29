@@ -82,19 +82,18 @@ def comP_P(P, _P, neg_M, neg_L):  # multi-variate cross-comP, _smP = 0 in line_p
     #sign, L, I, D, M, dert_, sub_H, _smP = P.sign, P.L, P.I, P.D, P.M, P.dert_, P.sub_layers, P.smP
     #_sign, _L, _I, _D, _M, _dert_, _sub_H, __smP = _P.sign, _P.L, _P.I, _P.D, _P.M, _P.dert_, _P.sub_layers, _P.smP
     derP = CderP()
+    _derP= CderP()
     sign, L, _smP= P.sign, P.L, P.smP
     _sign, _L = _P.sign, P.L
     dC_ave = ave_M * ave_rM ** (1 + neg_L / L)  # average match projected at current distance: neg_L, add coef / var?
     # if param fderived: m = min(var,_var) - dC_ave,
     # else:              m = dC_ave - abs(d_var), always a deviation:
     # append base param at index 0
-    derP.L = [P.L,min(L, _L) - dC_ave,L-_L]
-    derP.I = [P.I,dC_ave - abs(dI),P.I - _P.I]
-    derP.M = [P.M,min(P.M, _P.M) - dC_ave,P.M - _P.M]
-    derP.D = [P.D,min(P.D, _P.D) - dC_ave,P.D - _P.D]
+    derP = P.comp_param(_P,ave=dC_ave)
     
     
-    derP.mP = derP.I[1] + derP.L[1]  + derP.M[1] + derP.D[1]  # match(P, _P), no I: overlap, for regression to 0der-representation?
+    
+    derP.mP = derP.I.m + derP.L.m  + derP.M.m + derP.D.m  # match(P, _P), no I: overlap, for regression to 0der-representation?
     if sign == _sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
 
     smP = derP.mP > 0
@@ -153,7 +152,7 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comP p
             # terminate PPm:
             _derP.smP = smP     # previous _derP.smP equals current smP
             _derP.P = P_        # previous _derP.P equals P_ array
-            PPm_.append(CPP(L=_derP.L, I=_derP.I, D=_derP.D, M=_derP.M, mP=_derP.mP, neg_M=_derP.net_M, neg_L=_derP.neg_L, smP=_derP.smP, P_=_derP.P, sub_layers=sub_layers))
+            PPm_.append(_derP)
             # initialize PPm with current derP:
 
             #_smP, mP, neg_M, neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
@@ -164,16 +163,19 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comP p
             _derP = derP
         else:
             # accumulate PPm with current derP:
-            _derP.accum_from(derP) #accum numerical params
-            der = _derP.accum_list(derP,excluded=('P_','smP')) #accum list params
-            _derP.L = der['L']
-            _derP.I = der['I']
-            _derP.D = der['D']
-            _derP.M = der['M']
+            _derP.L.accum(derP.L)
+            _derP.I.accum(derP.I)
+            _derP.D.accum(derP.D)
+            _derP.M.accum(derP.M)
+            _derP.mP.accum(derP.mP)
+            _derP.neg_L.accum(derP.neg_L)
+            _derP.neg_M.accum(derP.neg_M)
             P_.append(derP.P)
         _smP = smP
     # pack last PP:
-    PPm_.append(CPP(L=_derP.L, I=_derP.I, D=_derP.D, M=_derP.M, mP=_derP.mP, neg_M=_derP.net_M, neg_L=_derP.neg_L, smP=smP, P_=P_, sub_layers=sub_layers))
+    _derP.P = P_
+    _derP.smP = smP
+    PPm_.append(_derP)
     #P_l = [len(P.P_) for P in PPm_]
     #ave_PPm_P = sum(P_l)/len(P_l)
     if len(PPm_.P_) > 8:
