@@ -149,33 +149,26 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comP p
             continue   
         smP = derP.smP
         if smP != _smP:
-            # terminate PPm:
-            _derP.smP = smP     # previous _derP.smP equals current smP
-            _derP.P = P_        # previous _derP.P equals P_ array
-            PPm_.append(_derP)
+            
+            PPm_.append(CPP(L=_derP.L,I=_derP.I,D=_derP.D,M=_derP.M,smP=smP,P_=P_,mP=_derP.mP,neg_M=_derP.neg_M,neg_L=_derP.neg_L,sub_layers=sub_layers))
             # initialize PPm with current derP:
-
-            #_smP, mP, neg_M, neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
-            #derP.smP, derP.mP, derP.neg_M, derP.neg_L, derP.P, derP.ML, derP.DL, derP.MI, derP.DI, derP.MD, derP.DD, derP.MM, derP.DM
             _smP = dert_P.smP  # Current smP becomes Previous smP i-e _smP
             _P = derP.P      #Current P becomes previous P i-e _P
             P_ = [_P]
             _derP = derP
         else:
             # accumulate PPm with current derP:
-            _derP.L.accum(derP.L)
-            _derP.I.accum(derP.I)
-            _derP.D.accum(derP.D)
-            _derP.M.accum(derP.M)
-            _derP.mP.accum(derP.mP)
-            _derP.neg_L.accum(derP.neg_L)
-            _derP.neg_M.accum(derP.neg_M)
+            _derP.L = _derP.L.accum(derP.L)
+            _derP.I = _derP.I.accum(derP.I)
+            _derP.D = _derP.D.accum(derP.D)
+            _derP.M = _derP.M.accum(derP.M)
+            _derP.mP = _derP.mP.accum(derP.mP)
+            _derP.neg_L = _derP.neg_L.accum(derP.neg_L)
+            _derP.neg_M = _derP.neg_M.accum(derP.neg_M)
             P_.append(derP.P)
         _smP = smP
     # pack last PP:
-    _derP.P = P_
-    _derP.smP = smP
-    PPm_.append(_derP)
+    PPm_.append(CPP(L=_derP.L,I=_derP.I,D=_derP.D,M=_derP.M,smP=smP,P_=P_,mP=_derP.mP,neg_M=_derP.neg_M,neg_L=_derP.neg_L,sub_layers=sub_layers))
     #P_l = [len(P.P_) for P in PPm_]
     #ave_PPm_P = sum(P_l)/len(P_l)
     if len(PPm_.P_) > 8:
