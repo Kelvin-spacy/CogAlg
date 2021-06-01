@@ -52,7 +52,7 @@ def comP_P_(P_):  # cross-comPare patterns within horizontal line
         neg_M = vmP = smP = _smP = neg_L = 0  # initialization
         M = P.M
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comP, no last-P displacement, just shifting first _P
-            if  M + neg_M > ave_M:  # search while net_M > ave or 1st _P, no selection by M sign
+            if P.M + neg_M > 0:  # search while net_M > ave or 1st _P, no selection by M sign
 
                 derP, _L, _smP = comP_P(P, _P, neg_M, neg_L)
                 smP, vmP, neg_M, neg_L, P = derP.smP, derP.mP, derP.neg_M, derP.neg_L, derP.P
@@ -138,37 +138,39 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comP p
     sub_layers = []
     #_smP, mP, neg_M, neg_L, _P, ML, DL, MI, DI, MD, DD, MM, DM = \
     #derP.smP, derP.mP, derP.neg_M, derP.neg_L, derP.P, derP.ML, derP.DL, derP.MI, derP.DI, derP.MD, derP.DD, derP.MM, derP.DM
-    
+    PP = CPP()
 
     for i, derP in enumerate(derP_, start=1):
         if i == 0:
             _smP = derP.smP
             _P = derP.P
             P_ = [_P]
-            _derP = derP
+            PP.L, PP.M, PP.I, PP.D, PP.smP, PP.P_, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
+            derP.L, derP.M, derP.I, derP.D, derP.smP, P_, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
             continue   
         smP = derP.smP
         if smP != _smP:
             
-            PPm_.append(CPP(L=_derP.L,I=_derP.I,D=_derP.D,M=_derP.M,smP=smP,P_=P_,mP=_derP.mP,neg_M=_derP.neg_M,neg_L=_derP.neg_L,sub_layers=sub_layers))
+            PPm_.append(PP)
             # initialize PPm with current derP:
             _smP = dert_P.smP  # Current smP becomes Previous smP i-e _smP
             _P = derP.P      #Current P becomes previous P i-e _P
             P_ = [_P]
-            _derP = derP
+            PP.L, PP.M, PP.I, PP.D, PP.smP, PP.P_, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
+            derP.L, derP.M, derP.I, derP.D, derP.smP, P_, derP.mP, derP.neg_M, derPP.neg_L, sub_layers        
         else:
             # accumulate PPm with current derP:
-            _derP.L = _derP.L.accum(derP.L)
-            _derP.I = _derP.I.accum(derP.I)
-            _derP.D = _derP.D.accum(derP.D)
-            _derP.M = _derP.M.accum(derP.M)
-            _derP.mP = _derP.mP.accum(derP.mP)
-            _derP.neg_L = _derP.neg_L.accum(derP.neg_L)
-            _derP.neg_M = _derP.neg_M.accum(derP.neg_M)
+            PP.L = PP.L.accum(derP.L)
+            PP.I = PP.I.accum(derP.I)
+            PP.D = PP.D.accum(derP.D)
+            PP.M = PP.M.accum(derP.M)
+            PP.mP = PP.mP.accum(derP.mP)
+            PP.neg_L = PP.neg_L.accum(derP.neg_L)
+            PP.neg_M = PP.neg_M.accum(derP.neg_M)
             P_.append(derP.P)
         _smP = smP
     # pack last PP:
-    PPm_.append(CPP(L=_derP.L,I=_derP.I,D=_derP.D,M=_derP.M,smP=smP,P_=P_,mP=_derP.mP,neg_M=_derP.neg_M,neg_L=_derP.neg_L,sub_layers=sub_layers))
+    PPm_.append(PP)
     #P_l = [len(P.P_) for P in PPm_]
     #ave_PPm_P = sum(P_l)/len(P_l)
     if len(PPm_.P_) > 8:
