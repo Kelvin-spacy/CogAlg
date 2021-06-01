@@ -13,7 +13,7 @@ differences in interfaces are mostly eliminated.
 import weakref
 from numbers import Number
 from inspect import isclass
-from operator import add
+
 NoneType = type(None)
 
 # ----------------------------------------------------------------------------
@@ -50,13 +50,19 @@ class MetaCluster(type):
     """
     def __new__(mcs, typename, bases, attrs):  # called right before a new class is created
         # get fields/params and numeric params
+        replace = attrs.get('replace', {})
 
         # inherit params
         for base in bases:
             if issubclass(base, ClusterStructure):
                 for param in base.numeric_params:
-                    if param not in attrs:
-                        attrs[param] = Cdm
+                    if param not in attrs:  # prevents duplication of base params
+                        if param in replace:
+                            new_param, new_type = replace[param]
+                            if new_param is not None:
+                                attrs[new_param] = new_type
+                        else:
+                            attrs[param] = Cdm
 
         # only ignore param names start with double underscore
         params = tuple(attr for attr in attrs
@@ -66,12 +72,6 @@ class MetaCluster(type):
         numeric_params = tuple(param for param in params
                                if (issubclass(attrs[param], Number)) and
                                not (issubclass(attrs[param], bool))) # avoid accumulate bool, which is flag
-        list_params = tuple(param for param in params
-                               if (issubclass(attrs[param], list)) and
-                               not (issubclass(attrs[param], bool)) and
-                               not (issubclass(attrs[param], int)) and
-                               not (issubclass(attrs[param],NoneType))) # avoid accumulate bool, which is flag
-
 
         # Fill in the template
         methods_definitions = _methods_template.format(
@@ -81,8 +81,6 @@ class MetaCluster(type):
                                  for param in params),
             numeric_param_vals=', '.join(f'self.{param}'
                                          for param in numeric_params),
-            list_param_vals=', '.join(f'self.{param}'
-                                         for param in list_params),
             pack_args=', '.join(param for param in ('', *params)),
             pack_assignments='; '.join(f'self.{param} = {param}'
                                   for param in params)
@@ -108,7 +106,6 @@ class MetaCluster(type):
             attrs[param + '_type'] = attrs.pop(param)
         # attrs['params'] = params
         attrs['numeric_params'] = numeric_params
-        attrs['list_params'] = list_params
 
         # Add fields/params and other instance attributes
         attrs['__slots__'] = (('_id', 'hid', *params, '__weakref__')
@@ -122,8 +119,8 @@ class MetaCluster(type):
 
         return cls
 
-    def __call__(cls, *args, **kwargs):  # call right before a new instace is created
-        # register new instace
+    def __call__(cls, *args, **kwargs):  # call right before a new instance is created
+        # register new instance
         instance = super().__call__(*args, **kwargs)
 
         # initialize fields/params
@@ -155,7 +152,7 @@ class MetaCluster(type):
 # ClusterStructure class
 class ClusterStructure(metaclass=MetaCluster):
     """
-    Class for cluster objects in 2D implementation of CogAlg.
+    Class for cluster objects in CogAlg.
     Each time a new instance is created, four things are done:
     - Set initialize field/param.
     - Set id.
@@ -201,11 +198,6 @@ class ClusterStructure(metaclass=MetaCluster):
 
     def __init__(self, **kwargs):
         pass
-    def accum_list(self,other,excluded=()):
-        return {param:list(map(add,(getattr(self,param)),(getattr(other,param)))) 
-               for param in self.list_params
-                   if param not in excluded}
-
 
     def accum_from(self, other, excluded=()):
         """Accumulate params from another structure."""
@@ -213,10 +205,12 @@ class ClusterStructure(metaclass=MetaCluster):
                            for param in self.numeric_params
                            if param not in excluded})
 
-        # compare root layer to get 1st layer derivatives
-    def comp_param(self, other, ave, excluded=()):
+
+    def comp_param(self, other, ave, excluded=()):  # compare root layer to get 1st dm_layer
+
         # Get the subclass (inherited class) and init a new instance
         dm = self.__class__.__subclasses__()[0]()
+        dm.dm_layer = self.__class__.__subclasses__()[0]()
 
         excluded += ('Dy', 'Dx', 'Day', 'Dax') # always exclude dy and dx related components
 
@@ -224,13 +218,23 @@ class ClusterStructure(metaclass=MetaCluster):
             if param not in excluded and param in other.numeric_params:
                 p = getattr(self, param)
                 _p = getattr(other, param)
+                '''
+                not needed
+                if isinstance(p, Cdm) and isinstance(_p, Cdm):  # compute dm recursively through binary tree of d|m
+                    dmi = p.comp_dm(_p, ave) # dm instance
+                else:
+                '''
                 d = p - _p  # difference
                 if param == 'I':
                     m = ave - abs(d)  # indirect match
                 else:
                     m = min(p,_p) - abs(d)/2 - ave  # direct match
+                dmi = Cdm(d, m)  # dm instance
+
                 # assign:
-                setattr(dm, param, Cdm(d, m))
+                setattr(dm, param,dm)           # if dm is set in dm_layer, what would we set in der's param?
+                setattr(dm.dm_layer, param, dmi) # set dm in dm_layer
+
 
         if 'Dy' in self.numeric_params and 'Dy' in other.numeric_params:
             dy = getattr(self, 'Dy'); _dy = getattr(other, 'Dy')
@@ -239,6 +243,7 @@ class ClusterStructure(metaclass=MetaCluster):
             da = a * _a.conjugate()                # angle difference
             ma = ave - abs(da)                     # match
             setattr(dm, 'Vector', Cdm(da, ma))
+            setattr(dm.dm_layer, 'Vector', Cdm(da, ma)) # set dm in dm_layer
 
         if 'Day' in self.numeric_params and 'Day' in other.numeric_params:
             day = getattr(self, 'Day'); _day = getattr(other, 'Day')
@@ -254,131 +259,27 @@ class ClusterStructure(metaclass=MetaCluster):
             dda = dday * ddax   # sum of angle difference
             mda = ave - abs(dda) # match
             setattr(dm, 'aVector', Cdm(dda, mda))
+            setattr(dm.dm_layer, 'aVector', Cdm(dda, mda)) # set dm in dm_layer
 
         return dm
-    
-    
-    # compare 1st layer derivatives to get 2nd layer derivatives 
-    def comp_param_layer(self, other, ave, excluded=()):
-        
-        nested_dm = self.__class__.__subclasses__()[0]()
-        
-        for param in self.numeric_params:
-            if param not in excluded and param in other.numeric_params:
-             
-                dm = getattr(self, param) 
-                _dm = getattr(other, param)        
-                
-                nested_param = dm.comp_dm(_dm, ave)
-        
-                setattr(nested_dm, param, nested_param)
-                
-                # preserve dm in nested param? So that we can access root level param
-                # setattr(nested_dm, param, (dm, nested_param))
-                
-        return nested_dm
-# ----------------------------------------------------------------------------
 
-'''
-class Clayer(object): no new params, base params are replaced by d,m after comp_param
-'''
 
 class Cdm(Number):
     __slots__ = ('d', 'm')
+
     def __init__(self, d=0, m=0):
         self.d, self.m = d, m
 
-    def accum(self, other):
+    def __add__(self, other):
         return Cdm(self.d + other.d, self.m + other.m)
 
-    def comp_dm(self, other, ave):  # adds a level of nesting to self dert
-        if isinstance(self.d, complex): # vector and avector
-            d = self.d * other.d.conjugate()   # angle difference
-            m = ave - abs(d)                   # match
+
+    def __repr__(self):  # representation of object
+        if isinstance(self.d, Cdm) or isinstance(self.m, Cdm):
+            return "Cdm(d=Cdm, m=Cdm)"
         else:
-            d = self.d - other.d
-            m = min(self.m, other.m) - abs(d)/2 - ave
-        return Cdm(d,m)
-    
-    def __repr__(self):
-        return "(d={}, m={})".format(self.d, self.m)
-'''
-    def comp_param(self, other, ave, excluded=()):
-        # Get the subclass (inherited class) and init a new instance
-        dert = self.__class__.__subclasses__()[0]()
+            return "Cdm(d={}, m={})".format(self.d, self.m)
 
-        excluded += ('Dy', 'Dx', 'Day', 'Dax') # always exclude dy and dx related components
-
-        for param in self.numeric_params:
-            if param not in excluded and param in other.numeric_params:
-                p = getattr(self, param)
-                _p = getattr(other, param)
-                d = p - _p  # difference
-                if param == 'I':
-                    m = ave - abs(d)  # indirect match
-                else:
-                    m = min(p,_p) - abs(d)/2 - ave  # direct match
-                # assign to dert:
-                setattr(dert, param, Cdert(p, d, m))
-
-        if 'Dy' in self.numeric_params and 'Dy' in other.numeric_params:
-            dy = getattr(self, 'Dy'); _dy = getattr(other, 'Dy')
-            dx = getattr(self, 'Dx'); _dx = getattr(other, 'Dx')
-            a =  dx + 1j * dy; _a = _dx + 1j * _dy # angle in complex form
-            da = a * _a.conjugate()                # angle difference
-            ma = ave - abs(da)                     # match
-            setattr(dert, 'Vector', Cdert(a, da, ma))
-
-        if 'Day' in self.numeric_params and 'Day' in other.numeric_params:
-            day = getattr(self, 'Day'); _day = getattr(other, 'Day')
-            dax = getattr(self, 'Dax'); _dax = getattr(other, 'Dax')
-
-            dday = day * _day.conjugate() # angle difference of complex day
-            ddax = dax * _dax.conjugate() # angle difference of complex dax
-            # formula for sum of angles, ~ angle_diff:
-            # daz = (cos_1*cos_2 - sin_1*sin_2) + j*(cos_1*sin_2 + sin_1*cos_2)
-            #     = (cos_1 + j*sin_1)*(cos_2 + j*sin_2)
-            #     = az1 * az2
-            dda = dday * ddax   # sum of angle difference
-            mda = ave - abs(dda) # match
-            setattr(dert, 'aVector', Cdert((day, dax), dda, mda))
-
-        return dert
-'''
-# ----------------------------------------------------------------------------
-'''
-class Cdert(Number):
-    __slots__ = ('p', 'd', 'm')
-    def __init__(self, p=0, d=0, m=0):
-        self.p, self.d, self.m = p, d, m
-
-    def accum(self, other):
-
-        return Cdert(self.p + other.p, self.d + other.d, self.m + other.m)
-
-    def comp_dert(self, other, ave):  # adds a level of nesting to self dert
-
-        p = self.comp_dert_fcn(self.m, other.m, ave)
-        m = self.comp_dert_fcn(self.m, other.m, ave)
-        d = self.comp_dert_fcn(self.d, other.d, ave)
-        
-        return Cdert(p, m, d)
-
-
-    def comp_dert_fcn(self, param, _param, ave):
-        
-        d = param - _param
-        if param == self.p and (self == 'I' or self == 'Vector' or self == 'aVector'):
-            m = ave - abs(d)
-        else:
-            m = min(param, _param) - abs(d)/2 - ave
-            
-        return Cdert(param, d, m)
-
-    def __repr__(self):
-        return "(p={}, d={}, m={})".format(self.p, self.d, self.m)
-
-        '''
 
 if __name__ == "__main__":  # for tests
     class CP(ClusterStructure):
@@ -388,6 +289,7 @@ if __name__ == "__main__":  # for tests
         M = int
 
     class CderP(CP):
+        dm_layer = object
         mP=int
 
     class CPP(CderP):
