@@ -35,9 +35,11 @@ class CderP(CP):
     neg_M = int
     neg_L = int
     P = object
+    dm_layer = object
 
 class CPP(CderP):
     P_ = list
+    sub_layers = list
 
 ave = 100  # ave dI -> mI, * coef / var type
 '''
@@ -131,28 +133,41 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
     PPm_ = []
     derP = derP_[0]
     PP_P_ = [derP.P]  # initialize PPm with first derP (positive PPms only, no contrast: miss over discontinuity is expected)
+    PP = CPP()
 
     for i, derP in enumerate(derP_, start=1):
+        if i == 0:
+            _sign = derP.sign
+            _P = derP.P
+            P_ = [_P]
+            PP.dm_layer, PP.sign, PP.P_, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
+            derP.dm_layer, derP.sign, P_, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
+            continue   
         sign = derP.sign
         if sign != _sign:
             # terminate PPm:
-            PPm_.append(CPP(sign=sign, mP=derP.mP, neg_M=derP.neg_M, neg_L=derP.neg_L, P_=derP.P_, dm_layer=derP.dm_layer))
+            PP.sign = sign
+            PP.P_ = P_
+            PPm_.append(PP)
             # initialize PPm with current derP:
-            _sign, mP, neg_M, neg_L, _P, mL, dL, mI, dI, mD, dD, mM, dM = \
-            derP.sign, derP.mP, derP.neg_M, derP.Neg_L, derP.P, dm_layer=derP.dm_layer
+            _sign = derP.sign
+            _P = derP.P
             P_ = [_P]
+            PP.dm_layer, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
+            derP.dm_layer, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
+            
         else:
             # accumulate PPm with current derP:
-            mP += derP.mP
-            neg_M += derP.neg_M
-            neg_L += derP.neg_L
-            for PP_param, derP_param in zip(PP.dm_layer, derP.dm_layer):
-                PP_param += derP_param  # just a draft
+            PP.accum_from(derP,excluded=('dm_layer'))
+            PP.dm_layer.accum_from(derP.dm_layer)
+            
             P_.append(derP.P)
         _sign = sign
     # pack last PP:
-    PPm_.append(CPP(sign=_sign, mP=mP, neg_M=neg_M, neg_L=neg_L, P_=P_, dm_layer=derP.dm_layer))
-
+    PP.sign = _sign
+    PP.P_ = P_
+    PPm_.append(PP)
+    
     return PPm_
 
 
