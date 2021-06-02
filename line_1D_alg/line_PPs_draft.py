@@ -176,14 +176,14 @@ def intra_PPm(PPm_,fid,rdn,rng):
 
 
 
-def r_search_P(P_,M):
+def rng_search_P(P_,M):
     rderP_ = []
     ave_M = ave_M + (M / len(P_) / 2 #global ave_M + local ave_M
     for i, P in enumerate(P_):
         neg_M = vmP = sign = _sign = neg_L = 0  # not sure if this is needed here
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
-            if P.M + neg_M > ave_M:  # search while net_M > ave_M i-e sum of local and global match
+            if P.M * (neg_L/P.L * ave_rM) + neg_M > ave_M. :  # search while net_M > ave_M i-e sum of local and global match
                 if not _P.M > P.M:   # skip previously compared P
                     rderP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
                     sign, vmP, neg_M, neg_L, P = rderP.sign, rderP.mP, rderP.neg_M, rderP.neg_L, rderP.P
