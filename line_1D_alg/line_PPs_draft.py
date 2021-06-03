@@ -101,6 +101,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
     dm_layer = P.comp_param(_P, ave=dC_ave)  # comp_param may need to be edited
 
     mP = dm_layer.I.m + dm_layer.L.m + dm_layer.M.m + dm_layer.D.m  # match(P, _P), no I: for regression to 0der only?
+    dP = dm_layer.I.d + dm_layer.L.d + dm_layer.M.d + dm_layer.D.d  # difference(P,_P)
     # each m is a deviation, better absolute?
     if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
 
@@ -133,7 +134,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
                     else:
                         break  # deeper P and _P sub_layers are from different intra_comp forks, not comparable?
 
-    derP = CderP(sign=sign, mP=mP, neg_M=neg_M, neg_L=neg_L, P=P, dm_layer=dm_layer)
+    derP = CderP(sign=sign, mP=mP, dP=dP, neg_M=neg_M, neg_L=neg_L, P=P, dm_layer=dm_layer)
 
     return derP, _P.L, _P.sign
 
@@ -145,15 +146,13 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
     derP = derP_[0]
     PP_P_ = [derP.P]  # initialize PPm with first derP (positive PPms only, no contrast: miss over discontinuity is expected)
     PP = CPP()
+    _sign = derP.sign
+    _P = derP.P
+    P_ = [_P]
+    PP.dm_layer, PP.sign, PP.P_, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
+    derP.dm_layer, derP.sign, P_, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
 
-    for i, derP in enumerate(derP_, start=1):
-        if i == 0:
-            _sign = derP.sign
-            _P = derP.P
-            P_ = [_P]
-            PP.dm_layer, PP.sign, PP.P_, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
-            derP.dm_layer, derP.sign, P_, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
-            continue   
+    for i, derP in enumerate(derP_, start=1):  
         sign = derP.sign
         if sign != _sign:
             # terminate PPm:
@@ -169,7 +168,7 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
             
         else:
             # accumulate PPm with current derP:
-            PP.accum_from(derP,excluded=('dm_layer'))
+            PP.accum_from(derP,excluded=('dm_layer',))
             PP.dm_layer.accum_from(derP.dm_layer)
             
             P_.append(derP.P)
@@ -178,7 +177,7 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
     PP.sign = _sign
     PP.P_ = P_
     PPm_.append(PP)
-    
+
     return PPm_
 
 
