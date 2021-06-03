@@ -210,7 +210,8 @@ class ClusterStructure(metaclass=MetaCluster):
 
         # Get the subclass (inherited class) and init a new instance
         der = self.__class__.__subclasses__()[0]() # derCluster
-        der.dm_layer = der.__class__.__subclasses__()[0]()
+        der.layer0 = self.__class__.__subclasses__()[0]()
+        der.layer1 = self.__class__.__subclasses__()[0]()
 
         # always exclude dy and dx related components
         if isinstance(excluded, str): # single element 'excluded' will be in string instead of tuple, since tuple need at least 2 elements
@@ -231,8 +232,8 @@ class ClusterStructure(metaclass=MetaCluster):
                 dm = Cdm(d, m)  # dm instance
 
                 # assign:
-                setattr(der, param, p)            # set root param
-                setattr(der.dm_layer, param, dm) # set dm in dm_layer
+                setattr(der.layer0, param, p)            # set root param
+                setattr(der.layer1, param, dm) # set dm in layer1
 
         if 'Dy' in self.numeric_params and 'Dy' in other.numeric_params:
             dy = getattr(self, 'Dy'); _dy = getattr(other, 'Dy')
@@ -240,8 +241,8 @@ class ClusterStructure(metaclass=MetaCluster):
             a =  dx + 1j * dy; _a = _dx + 1j * _dy # angle in complex form
             da = a * _a.conjugate()                # angle difference
             ma = ave - abs(da)                     # match
-            setattr(der, 'Vector', a ) # set root param
-            setattr(der.dm_layer, 'Vector', Cdm(da, ma)) # set dm in dm_layer
+            setattr(der.layer0, 'Vector', a ) # set root param
+            setattr(der.layer1, 'Vector', Cdm(da, ma)) # set dm in layer1
 
         if 'Day' in self.numeric_params and 'Day' in other.numeric_params:
             day = getattr(self, 'Day'); _day = getattr(other, 'Day')
@@ -256,8 +257,8 @@ class ClusterStructure(metaclass=MetaCluster):
             #     = az1 * az2
             dda = dday * ddax   # sum of angle difference
             mda = ave - abs(dda) # match
-            setattr(der, 'aVector', (day, dax))  # set root param
-            setattr(der.dm_layer, 'aVector', Cdm(dda, mda)) # set dm in dm_layer
+            setattr(der.layer0, 'aVector', (day, dax))  # set root param
+            setattr(der.layer1, 'aVector', Cdm(dda, mda)) # set dm in layer1
 
         return der
 
@@ -317,21 +318,41 @@ if __name__ == "__main__":  # for tests
         I = int
         M = int
 
-    class CderP(CP):
-        dm_layer = object
+    class Clayer(CP):
+        layer0 = object
+        layer1 = object
+        
+    class CderP(ClusterStructure):
+        layer0 = object
+        layer1 = object
         mP=int
-
+        neg_M = int
+        neg_L=int
     class CPP(CderP):
-        pass
+        layer0 = object
+        layer1 = object
+        P_ = list
 
     b = CP(L=1,D=2,I=5,M=9)
     c = CP(L=4,D=5,I=7,M=7)
     d = CP(L=8,D=6,I=2,M=1)
-    derP1 = b.comp_param(c, ave=15)  # automatically return the inherited class (it is assumed to contain ders)
-    #derP2 = c.comp_param(d, ave=15)
-    #derP.L.accum()
-    print(derP1.dm_layer)
+    clayer1 = b.comp_param(c, ave=15)  #return Clayer 
+    clayer2 = b.comp_param(c, ave=15)
+
+    derP1 = CderP(sign=7,mP=1,neg_M=2,neg_L=3,layer0=clayer1.layer0,layer1=clayer1.layer1)
+    derP2 = CderP(sign=9,mP=4,neg_M=8,neg_L=9,layer0=clayer2.layer0,layer1=clayer2.layer1)
+
+    derP1.accum_from(derP2)
     
-    #print(derP2)
-    #derP3 = derP1.comp_param_layer(derP2, ave=15, excluded=('mP')) 
-    #print(derP3)
+    print(derP1)
+    print(derP1.layer1)
+    print(derP2.layer1)
+
+    derP1.layer1.accum_from(derP2.layer1)
+    print(derP1.layer1)
+
+    derP1.layer0.accum_from(derP2.layer0)
+    print(derP1.layer0)
+
+    PP = CPP(mP=derP1.mP,neg_M=derP1.neg_M,neg_L=derP1.neg_L,P_=[derP1.layer0],layer0=derP1.layer0,layer1=derP1.layer1)
+    print(PP.layer0)

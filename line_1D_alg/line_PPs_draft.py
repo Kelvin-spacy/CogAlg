@@ -35,12 +35,10 @@ class CderP(CP):
     dP = int
     neg_M = int
     neg_L = int
-    P = object
-    dm_layer = list  # or object
+    layer0 = object
+    layer1 = object
 
 class CPP(CderP):
-    P_ = list
-    top_layer = list  # or object  # inherit from CP
     sub_layers = list
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -65,7 +63,7 @@ def search(P_):  # cross-compare patterns within horizontal line
                # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 
                 derP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
-                sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.P
+                sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.layer0
                 if sign:
                     P_[i + 1 + j].sign = True  # backward match per P: __sign = True
                     derP_.append(derP)
@@ -75,12 +73,12 @@ def search(P_):  # cross-compare patterns within horizontal line
                     neg_L += _L   # accumulate distance to match
                     if j == len(P_):
                         # last P is a singleton derP, derivatives are ignored:
-                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P ))
+                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, layer0=P ))
                     '''                     
                     no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
-                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P))
+                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, layer0=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
@@ -97,11 +95,11 @@ def search(P_):  # cross-compare patterns within horizontal line
 def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_patterns
 
     dC_ave = ave_M * ave_rM ** (1 + neg_L / P.L)  # average match projected at current distance: neg_L, add coef / var?
+    layer0 = P
+    layer1 = P.comp_param(_P, ave=dC_ave)  # comp_param may need to be edited
 
-    dm_layer = P.comp_param(_P, ave=dC_ave)  # comp_param may need to be edited
-
-    mP = dm_layer.I.m + dm_layer.L.m + dm_layer.M.m + dm_layer.D.m  # match(P, _P), no I: for regression to 0der only?
-    dP = dm_layer.I.d + dm_layer.L.d + dm_layer.M.d + dm_layer.D.d  # difference(P,_P)
+    mP = layer1.I.m + layer1.L.m + layer1.M.m + layer1.D.m  # match(P, _P), no I: for regression to 0der only?
+    dP = layer1.I.d + layer1.L.d + layer1.M.d + layer1.D.d  # difference(P,_P)
     # each m is a deviation, better absolute?
     if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
 
@@ -134,7 +132,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
                     else:
                         break  # deeper P and _P sub_layers are from different intra_comp forks, not comparable?
 
-    derP = CderP(sign=sign, mP=mP, dP=dP, neg_M=neg_M, neg_L=neg_L, P=P, dm_layer=dm_layer)
+    derP = CderP(sign=sign, mP=mP, dP=dP, neg_M=neg_M, neg_L=neg_L, layer0 = layer0, layer1=layer1)
 
     return derP, _P.L, _P.sign
 
@@ -145,7 +143,7 @@ def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp p
     PPm_ = []
     derP = derP_[0]
     PP_P_ = [derP.P]  # initialize PPm with first derP (positive PPms only, no contrast: miss over discontinuity is expected)
-    PP = CPP()
+
     _sign = derP.sign
     _P = derP.P
     P_ = [_P]
