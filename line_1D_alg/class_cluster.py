@@ -210,9 +210,13 @@ class ClusterStructure(metaclass=MetaCluster):
 
         # Get the subclass (inherited class) and init a new instance
         der = self.__class__.__subclasses__()[0]() # derCluster
-        der.dm_layer = self.__class__.__subclasses__()[0]() # dm_layer having same class as derivative, or create a new class
+        der.dm_layer = der.__class__.__subclasses__()[0]()
 
-        excluded += ('Dy', 'Dx', 'Day', 'Dax') # always exclude dy and dx related components
+        # always exclude dy and dx related components
+        if isinstance(excluded, str): # single element 'excluded' will be in string instead of tuple, since tuple need at least 2 elements
+            excluded = (excluded, 'Dy', 'Dx', 'Day', 'Dax')
+        else:
+            excluded += ('Dy', 'Dx', 'Day', 'Dax')
 
         for param in self.numeric_params:
             if param not in excluded and param in other.numeric_params:
@@ -229,7 +233,7 @@ class ClusterStructure(metaclass=MetaCluster):
                 # assign:
                 setattr(der, param, p)            # set root param
                 setattr(der.dm_layer, param, dm) # set dm in dm_layer
-                
+
         if 'Dy' in self.numeric_params and 'Dy' in other.numeric_params:
             dy = getattr(self, 'Dy'); _dy = getattr(other, 'Dy')
             dx = getattr(self, 'Dx'); _dx = getattr(other, 'Dx')
@@ -255,22 +259,14 @@ class ClusterStructure(metaclass=MetaCluster):
             setattr(der, 'aVector', (day, dax))  # set root param
             setattr(der.dm_layer, 'aVector', Cdm(dda, mda)) # set dm in dm_layer
 
-
-        '''
-        for param in self.numeric_params:
-            if param  in excluded:
-                delattr(der, param)
-                delattr(der.dm_layer, param)
-        '''
-        
         return der
 
 
     def comp_dm(self, other, ave, excluded=()):  # compare dm layer to get subsequent dm layer
-            
+
         der = self.__class__.__subclasses__()[0]() # derCluster
-        der.dm_layer = self.__class__.__subclasses__()[0]() # dm_layer having same class as derivative
-        
+        der.dm_layer = self.__class__.__subclasses__()[0]() # dm_layer has same class as derCluster
+
         for param in self.numeric_params:
             if param not in excluded and param in other.numeric_params:
                 dmi = getattr(self, param)   # dm instance
@@ -286,13 +282,13 @@ class ClusterStructure(metaclass=MetaCluster):
                     md = min(dmi.d, _dmi.d) - abs(dd) / 2 - ave  # match of d
                     dm = dmi.m - _dmi.m  # difference of m
                     mm = min(dmi.m, _dmi.m) - abs(dm) / 2 - ave  # match of m
-                
+
                 d = Cdm(dd, md)  # difference and match of d
                 m = Cdm(dm, mm)  # difference and match of m
 
                 setattr(der, param, dmi)  # set root param
                 setattr(der.dm_layer, param, Cdm(d, m)) # set dm in dm_layer
-                
+
         return der
 
 
@@ -312,7 +308,6 @@ class Cdm(Number):
             return "Cdm(d=Cdm, m=Cdm)"
         else:
             return "Cdm(d={}, m={})".format(self.d, self.m)
-
 
 
 if __name__ == "__main__":  # for tests
@@ -335,7 +330,8 @@ if __name__ == "__main__":  # for tests
     derP1 = b.comp_param(c, ave=15)  # automatically return the inherited class (it is assumed to contain ders)
     #derP2 = c.comp_param(d, ave=15)
     #derP.L.accum()
-    print(derP1)
+    print(derP1.dm_layer)
+    
     #print(derP2)
     #derP3 = derP1.comp_param_layer(derP2, ave=15, excluded=('mP')) 
     #print(derP3)

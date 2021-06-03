@@ -32,35 +32,37 @@ from class_cluster import ClusterStructure, NoneType
 class CderP(CP):
     sign = bool
     mP = int
+    dP = int
     neg_M = int
     neg_L = int
     P = object
-    dm_layer = object
+    dm_layer = list  # or object
 
 class CPP(CderP):
     P_ = list
+    top_layer = list  # or object  # inherit from CP
     sub_layers = list
 
 ave = 100  # ave dI -> mI, * coef / var type
-'''
-no ave_mP: deviation computed via rM  # ave_mP = ave*3: comp cost, or n vars per P: rep cost?
-'''
+# no ave_mP: deviation computed via rM  # ave_mP = ave* n_comp_params: comp cost, or n vars per P: rep cost?
 ave_div = 50
 ave_rM = .5  # average relative match per input magnitude, at rl=1 or .5?
 ave_M = 100  # search stop
 ave_sub_M = 50  # sub_H comp filter
 ave_Ls = 3
+ave_PPM = 200
 
-def search_P_(P_):  # cross-compare patterns within horizontal line
 
-    derP_ = []  # comp_P_ forms array of alternating-sign derPs (derivatives + P): output of pair-wise comp_P
+def search(P_):  # cross-compare patterns within horizontal line
+
+    derP_ = []  # search forms array of alternating-sign derPs (derivatives + P): output of pair-wise comp_P
 
     for i, P in enumerate(P_):
         neg_M = vmP = sign = _sign = neg_L = 0  # initialization
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
             if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
-               # add ave_M decay with distance?
+               # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 
                 derP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
                 sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.P
@@ -82,7 +84,14 @@ def search_P_(P_):  # cross-compare patterns within horizontal line
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
-    return derP_
+            if derP_:
+                for derP in derP_:
+                    if not derP.sign:  # check false sign
+                        print('False sign in line' + str(y))
+
+            PPm_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
+
+    return PPm_
 
 
 def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_patterns
@@ -91,12 +100,13 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
 
     dm_layer = P.comp_param(_P, ave=dC_ave)  # comp_param may need to be edited
 
-    mP = dm_layer.I.m + dm_layer.L.m + dm_layer.M.m + dm_layer.D.m  # match(P, _P), no I: overlap, for regression to 0der-representation?
+    mP = dm_layer.I.m + dm_layer.L.m + dm_layer.M.m + dm_layer.D.m  # match(P, _P), no I: for regression to 0der only?
+    # each m is a deviation, better absolute?
     if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
 
     sign = mP > 0
     if sign:  # positive forward match, compare sub_layers between P.sub_H and _P.sub_H:
-        dert_sub_H = []  # sub hierarchy, abbreviation for new sub_layers
+        der_sub_H = []  # sub hierarchy, abbreviation for new sub_layers
 
         if P.sub_layers and _P.sub_layers:  # not empty sub layers
             for sub_P, _sub_P in zip(P.sub_layers, _P.sub_layers):
@@ -111,11 +121,11 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
                         # compare all sub_Ps to each _sub_P, form dert_sub_P per compared pair
                         for sub_P in sub_P_:  # note name recycling in nested loop
                             for _sub_P in _sub_P_:
-                                dert_sub_P, _, _ = comp_P(sub_P, _sub_P, neg_M=0, neg_L=0)  # ignore _sub_L, _sub_sign?
-                                sub_mP += dert_sub_P.mP  # sum sub_vmPs in derP_layer
-                                dert_sub_P_.append(dert_sub_P)
+                                der_sub_P, _, _ = comp_P(sub_P, _sub_P, neg_M=0, neg_L=0)  # ignore _sub_L, _sub_sign?
+                                sub_mP += der_sub_P.mP  # sum sub_vmPs in derP_layer
+                                dert_sub_P_.append(der_sub_P)
 
-                        dert_sub_H.append((fdP, fid, rdn, rng, dert_sub_P_))  # add only layers that have been compared
+                        der_sub_H.append((fdP, fid, rdn, rng, dert_sub_P_))  # add only layers that have been compared
                         mP += sub_mP  # of compared H, no specific mP?
                         if sub_mP < ave_sub_M:
                             # potentially mH: trans-layer induction?
@@ -126,6 +136,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
     derP = CderP(sign=sign, mP=mP, neg_M=neg_M, neg_L=neg_L, P=P, dm_layer=dm_layer)
 
     return derP, _P.L, _P.sign
+
 
 
 def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp per PPm

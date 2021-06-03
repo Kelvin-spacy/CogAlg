@@ -350,16 +350,8 @@ if __name__ == "__main__":
     frame_PPm_ = []
     if fline_PPs:  # debug line_PPs
         for y, P_ in enumerate(frame_of_patterns_):
-            dert_P_ = comp_P_(P_[0])
-            frame_dert_P_.append(dert_P_)
-            if len(dert_P_) > 1:
-                frame_PPm_.append(form_PPm(dert_P_))
-
-            # check if there is false sign
-            if dert_P_:
-                for dert_P in dert_P_:
-                    if not dert_P.smP:  # check false sign
-                        print('False sign in line' + str(y))
+            PPm_ = search(P_)
+            frame_PPm_.append(PPm_)
 
     end_time = time() - start_time
     print(end_time)
