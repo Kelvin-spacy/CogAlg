@@ -62,7 +62,7 @@ class MetaCluster(type):
                             if new_param is not None:
                                 attrs[new_param] = new_type
                         else:
-                            attrs[param] = Cdm
+                            attrs[param] = getattr(base,param+'_type')
 
         # only ignore param names start with double underscore
         params = tuple(attr for attr in attrs
@@ -291,7 +291,7 @@ class ClusterStructure(metaclass=MetaCluster):
                 setattr(der.dm_layer, param, Cdm(d, m)) # set dm in dm_layer
 
         return der
-
+    
 
 
 class Cdm(Number):
@@ -309,6 +309,16 @@ class Cdm(Number):
             return "Cdm(d=Cdm, m=Cdm)"
         else:
             return "Cdm(d={}, m={})".format(self.d, self.m)
+def comp_param(param, _param, param_name, ave):
+
+        d = param - _param    # difference
+        if param_name == 'I':
+            m = ave - abs(d)  # indirect match
+        else:
+            m = min(param,_param) - abs(d)/2 - ave  # direct match
+            
+        return [d,m]
+
 
 
 if __name__ == "__main__":  # for tests
@@ -322,7 +332,7 @@ if __name__ == "__main__":  # for tests
         layer0 = object
         layer1 = object
         
-    class CderP(ClusterStructure):
+    class CderP(CP):
         layer0 = object
         layer1 = object
         mP=int
@@ -336,23 +346,23 @@ if __name__ == "__main__":  # for tests
     b = CP(L=1,D=2,I=5,M=9)
     c = CP(L=4,D=5,I=7,M=7)
     d = CP(L=8,D=6,I=2,M=1)
-    clayer1 = b.comp_param(c, ave=15)  #return Clayer 
-    clayer2 = b.comp_param(c, ave=15)
+    clayer1 = comp_param(b,c, ave=15)  #return Clayer 
+    #clayer2 = b.comp_param(c, ave=15)
+    print(clayer1)
+    #derP1 = CderP(sign=7,mP=1,neg_M=2,neg_L=3,layer0=clayer1.layer0,layer1=clayer1.layer1)
+    #derP2 = CderP(sign=9,mP=4,neg_M=8,neg_L=9,layer0=clayer2.layer0,layer1=clayer2.layer1)
 
-    derP1 = CderP(sign=7,mP=1,neg_M=2,neg_L=3,layer0=clayer1.layer0,layer1=clayer1.layer1)
-    derP2 = CderP(sign=9,mP=4,neg_M=8,neg_L=9,layer0=clayer2.layer0,layer1=clayer2.layer1)
-
-    derP1.accum_from(derP2)
+    #derP1.accum_from(derP2)
     
-    print(derP1)
-    print(derP1.layer1)
-    print(derP2.layer1)
+    #print(derP1)
+    #print(derP1.layer1)
+    #print(derP2.layer1)
 
-    derP1.layer1.accum_from(derP2.layer1)
-    print(derP1.layer1)
+    #derP1.layer1.accum_from(derP2.layer1)
+    #print(derP1.layer1)
 
-    derP1.layer0.accum_from(derP2.layer0)
-    print(derP1.layer0)
+    #derP1.layer0.accum_from(derP2.layer0)
+    #print(derP1.layer0)
 
-    PP = CPP(mP=derP1.mP,neg_M=derP1.neg_M,neg_L=derP1.neg_L,P_=[derP1.layer0],layer0=derP1.layer0,layer1=derP1.layer1)
-    print(PP.layer0)
+    #PP = CPP(mP=derP1.mP,neg_M=derP1.neg_M,neg_L=derP1.neg_L,P_=[derP1.layer0],layer0=derP1.layer0,layer1=derP1.layer1)
+    #print(PP.layer0)

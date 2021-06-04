@@ -29,16 +29,21 @@ import numpy as np
 from line_patterns import *
 from class_cluster import ClusterStructure, NoneType
 
-class CderP(CP):
+class CderP(ClusterStructure):
     sign = bool
     mP = int
     dP = int
     neg_M = int
     neg_L = int
+    P = list
+    layer1 = object
+class Clayer(ClusterStructure):
     layer0 = object
     layer1 = object
 
 class CPP(CderP):
+    P_ = list
+    layers = object
     sub_layers = list
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -59,11 +64,11 @@ def search(P_):  # cross-compare patterns within horizontal line
         neg_M = vmP = sign = _sign = neg_L = 0  # initialization
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
-            if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
+            if P.layer0.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
                # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 
                 derP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
-                sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.layer0
+                sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.P
                 if sign:
                     P_[i + 1 + j].sign = True  # backward match per P: __sign = True
                     derP_.append(derP)
@@ -73,12 +78,12 @@ def search(P_):  # cross-compare patterns within horizontal line
                     neg_L += _L   # accumulate distance to match
                     if j == len(P_):
                         # last P is a singleton derP, derivatives are ignored:
-                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, layer0=P ))
+                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P ))
                     '''                     
                     no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
-                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, layer0=P))
+                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
@@ -94,9 +99,8 @@ def search(P_):  # cross-compare patterns within horizontal line
 
 def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_patterns
 
-    dC_ave = ave_M * ave_rM ** (1 + neg_L / P.L)  # average match projected at current distance: neg_L, add coef / var?
-    layer0 = P
-    layer1 = P.comp_param(_P, ave=dC_ave)  # comp_param may need to be edited
+    dC_ave = ave_M * ave_rM ** (1 + neg_L / P.layer0.L)  # average match projected at current distance: neg_L, add coef / var?
+    layer1 = P.layer0.comp_param(_P.layer0, ave=dC_ave)  # comp_param may need to be edited
 
     mP = layer1.I.m + layer1.L.m + layer1.M.m + layer1.D.m  # match(P, _P), no I: for regression to 0der only?
     dP = layer1.I.d + layer1.L.d + layer1.M.d + layer1.D.d  # difference(P,_P)
@@ -132,49 +136,46 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
                     else:
                         break  # deeper P and _P sub_layers are from different intra_comp forks, not comparable?
 
-    derP = CderP(sign=sign, mP=mP, dP=dP, neg_M=neg_M, neg_L=neg_L, layer0 = layer0, layer1=layer1)
+    derP = CderP(sign=sign, mP=mP, dP=dP, neg_M=neg_M, neg_L=neg_L, P = P, layer1=layer1)
 
-    return derP, _P.L, _P.sign
+    return derP, _P.layer0.L, _P.sign
 
 
 
 def form_PPm(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp per PPm
 
     PPm_ = []
-    derP = derP_[0]
-    PP_P_ = [derP.P]  # initialize PPm with first derP (positive PPms only, no contrast: miss over discontinuity is expected)
+    _derP = derP_[0]
 
-    _sign = derP.sign
-    _P = derP.P
+    _sign = _derP.sign
+    _P = _derP.P
     P_ = [_P]
-    PP.dm_layer, PP.sign, PP.P_, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
-    derP.dm_layer, derP.sign, P_, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
+    _layers = Clayer(layer0=_P.layer0,layer1=_derP.layer1)
+
 
     for i, derP in enumerate(derP_, start=1):  
         sign = derP.sign
         if sign != _sign:
             # terminate PPm:
-            PP.sign = sign
-            PP.P_ = P_
-            PPm_.append(PP)
+            PPm_.append(CPP(sign=sign,mP=_derP.mP,neg_M=_derP.neg_M,neg_L=_derP.neg_L,sub_layers=sub_layers,P_=P_,layers=_layers))
             # initialize PPm with current derP:
             _sign = derP.sign
             _P = derP.P
             P_ = [_P]
-            PP.dm_layer, PP.mP, PP.neg_M, PP.neg_L, PP.sub_layers= \
-            derP.dm_layer, derP.mP, derP.neg_M, derPP.neg_L, sub_layers
+            _derP = derP
+            _layers = Clayer()
             
         else:
             # accumulate PPm with current derP:
-            PP.accum_from(derP,excluded=('dm_layer',))
-            PP.dm_layer.accum_from(derP.dm_layer)
+            _derP.accum_from(derP,excluded=('layer1',))
+            _layers.layer0.accum_from(derP.P.layer0) #not sure about layer0 accum
+            _layers.layer1.accum_from(derP.layer1)
             
             P_.append(derP.P)
         _sign = sign
     # pack last PP:
-    PP.sign = _sign
-    PP.P_ = P_
-    PPm_.append(PP)
+    
+    PPm_.append(CPP(sign=_sign,mP=_derP.mP,neg_M=_derP.neg_M,neg_L=_derP.neg_L,sub_layers=sub_layers,P_=P_,layers=_layers))
 
     return PPm_
 
@@ -186,7 +187,7 @@ def intra_PPm(PPm_,fid,rdn,rng):
     
     for PP in PPm_:
         if PP.smP:
-            rdert_ = range_comp(PP.P_,PP.M)
+            rdert_ = range_comp(PP.P_,PP.layer0.M)
             sub_PPm_ = form_PPm(rdert)
             Ls = len(sub_PPm_)
             PP.sub_layers += [[(Ls, fid, rdn, rng, sub_PPm_)]]
@@ -202,12 +203,12 @@ def intra_PPm(PPm_,fid,rdn,rng):
 def rng_search_P(P_,M):
     rderP_ = []
     ave_M = ave_M + (M / len(P_) / 2 #global ave_M + local ave_M
-    for i, P in enumerate(P_):
+    for i,P in enumerate(P_):
         neg_M = vmP = sign = _sign = neg_L = 0  # not sure if this is needed here
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
-            if P.M * (neg_L/P.L * ave_rM) + neg_M > ave_M. :  # search while net_M > ave_M i-e sum of local and global match
-                if not _P.M > P.M:   # skip previously compared P
+            if P.layer0.M * (neg_L/P.layer0.L * ave_rM) + neg_M > ave_M. :  # search while net_M > ave_M i-e sum of local and global match
+                if not _P.layer0.M > P.layer0.M:   # skip previously compared P
                     rderP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
                     sign, vmP, neg_M, neg_L, P = rderP.sign, rderP.mP, rderP.neg_M, rderP.neg_L, rderP.P
                     if sign:
@@ -225,11 +226,6 @@ def rng_search_P(P_,M):
                 rderP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
-
-
-
-
-             
 
     return rdert
 

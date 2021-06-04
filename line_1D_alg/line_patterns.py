@@ -28,17 +28,20 @@ class Cdert(ClusterStructure):
     p = int
     d = int
     m = int
-
-class CP(ClusterStructure):
-    sign = NoneType
+class Clayer(ClusterStructure):
     L = int
     I = int
     D = int
     M = int
+
+class CP(ClusterStructure):
+    sign = NoneType
+    layer0 = object
     dert_ = list
     sub_layers = list
     smP = NoneType
     fdert = NoneType
+
 
 # pattern filters or hyper-parameters: eventually from higher-level feedback, initialized here as constants:
 
@@ -104,14 +107,14 @@ def form_Pm_(P_dert_):  # initialization, accumulation, termination
     for dert in P_dert_[1:]:
         sign = dert.m > 0
         if sign != _sign:  # sign change, terminate P
-            P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))
+            P_.append(CP(sign=_sign, layer0=Clayer(L=L,I=I,D=D,M=M), dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset params
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, bilateral m: for eval per pixel
         dert_ += [dert]
         _sign = sign
 
-    P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))  # incomplete P
+    P_.append(CP(sign=_sign, layer0=Clayer(L=L,I=I,D=D,M=M), dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))  # incomplete P
     return P_
 
 
@@ -125,14 +128,14 @@ def form_Pd_(P_dert_):  # cluster by d sign, within -Pms: min neg m spans
     for dert in P_dert_[2:]:
         sign = dert.d > 0
         if sign != _sign:  # sign change, terminate P
-            P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))
+            P_.append(CP(sign=_sign, layer0=Clayer(L=L,I=I,D=D,M=M), dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset accumulated params
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, m for eval per pixel is bilateral
         dert_ += [dert]
         _sign = sign
 
-    P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))  # incomplete P
+    P_.append(CP(sign=_sign, layer0=Clayer(L=L,I=I,D=D,M=M), dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))  # incomplete P
     return P_
 
 
@@ -144,12 +147,12 @@ def form_adjacent_M_(Pm_):  # compute array of adjacent Ms, for contrastive borr
     That contrast is salient because it borrows predictive value from adjacent uniform span of inputs.
     '''
 
-    pri_M = Pm_[0].M  # comp_g value is borrowed from adjacent opposite-sign Ms
-    M = Pm_[1].M
-    adj_M_ = [abs(Pm_[1].M)]  # initial next_M, no / 2: projection for first P, abs for bilateral adjustment
+    pri_M = Pm_[0].layer0.M  # comp_g value is borrowed from adjacent opposite-sign Ms
+    M = Pm_[1].layer0.M
+    adj_M_ = [abs(Pm_[1].layer0.M)]  # initial next_M, no / 2: projection for first P, abs for bilateral adjustment
 
     for Pm in Pm_[2:]:
-        next_M = Pm.M
+        next_M = Pm.layer0.M
         adj_M_.append((abs(pri_M / 2) + abs(next_M / 2)))  # exclude M
         pri_M = M
         M = next_M
@@ -179,7 +182,7 @@ def intra_Pm_(P_, adj_M_, fid, rdn, rng):  # evaluate for sub-recursion in line 
     for P, adj_M in zip(P_, adj_M_):  # each sub_layer is nested to depth = sub_layers[n]
 
         if P.sign:  # +Pm: low-variation span, eval comp at rng=2^n: 2, 4., kernel: 5, 9., rng=1 cross-comp is kernels 2 and 3
-            if P.M - adj_M > ave_M * rdn and P.L > 4:  # reduced by lending to contrast: all comps form params for hLe comp?
+            if P.layer0.M - adj_M > ave_M * rdn and P.layer0.L > 4:  # reduced by lending to contrast: all comps form params for hLe comp?
 
                 r_dert_ = range_comp(P.dert_, fid)  # rng+ comp, skip predictable next dert
                 sub_Pm_ = form_Pm_(r_dert_)  # cluster by m sign
@@ -193,9 +196,9 @@ def intra_Pm_(P_, adj_M_, fid, rdn, rng):  # evaluate for sub-recursion in line 
                                    zip_longest(comb_layers, P.sub_layers, fillvalue=[])]
 
         else:  # -Pm: high-variation span, min neg M is contrast value, borrowed from adjacent +Pms:
-            if min(-P.M, adj_M) > ave_D * rdn and P.L > 3:  # cancelled M+ val, M = min | ~v_SAD
+            if min(-P.layer0.M, adj_M) > ave_D * rdn and P.layer0.L > 3:  # cancelled M+ val, M = min | ~v_SAD
 
-                rel_adj_M = adj_M / -P.M  # for allocation of -Pm' adj_M to each of its internal Pds
+                rel_adj_M = adj_M / -P.layer0.M  # for allocation of -Pm' adj_M to each of its internal Pds
                 sub_Pd_ = form_Pd_(P.dert_)  # cluster by input d sign match: partial d match
                 Ls = len(sub_Pd_)
                 P.sub_layers += [[(Ls, True, 1, rdn, rng, sub_Pd_)]]  # 1st layer, Dert=[], fill if Ls > min?
@@ -212,7 +215,7 @@ def intra_Pd_(Pd_, rel_adj_M, rdn, rng):  # evaluate for sub-recursion in line P
 
     comb_layers = []
     for P in Pd_:  # each sub in sub_ is nested to depth = sub_[n]
-        if min(abs(P.D), abs(P.D) * rel_adj_M) > ave_D * rdn and P.L > 3:  # abs(D) * rel_adj_M: allocated adj_M
+        if min(abs(P.layer0.D), abs(P.layer0.D) * rel_adj_M) > ave_D * rdn and P.layer0.L > 3:  # abs(D) * rel_adj_M: allocated adj_M
             # if fid: abs(D), else: M + ave*L: complementary m is more precise than inverted diff?
 
             d_dert_ = deriv_comp(P.dert_)  # cross-comp of uni_ds
