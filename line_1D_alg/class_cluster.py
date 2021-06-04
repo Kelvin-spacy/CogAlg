@@ -205,8 +205,21 @@ class ClusterStructure(metaclass=MetaCluster):
                            for param in self.numeric_params
                            if param not in excluded})
 
+    def comp_param(self, other, ave):
+        dm = []
+        param_name = []
+        for param,_param in zip(self.numeric_params,other.numeric_params):
+            d = getattr(self, param) - getattr(other, _param)    # difference
+            if param == 'I':
+                m = ave - abs(d)  # indirect match
+            else:
+                m = min(getattr(self, param), getattr(other, _param)) - abs(d)/2 - ave  # direct match
+            param_name.append(param)
 
-    def comp_param(self, other, ave, excluded=()):  # compare root layer to get 1st dm_layer
+            dm.append([d,m])
+        return dm,param_name
+
+    def comp_param_dm(self, other, ave, excluded=()):  # compare root layer to get 1st dm_layer
 
         # Get the subclass (inherited class) and init a new instance
         der = self.__class__.__subclasses__()[0]() # derCluster
@@ -309,15 +322,7 @@ class Cdm(Number):
             return "Cdm(d=Cdm, m=Cdm)"
         else:
             return "Cdm(d={}, m={})".format(self.d, self.m)
-def comp_param(param, _param, param_name, ave):
 
-        d = param - _param    # difference
-        if param_name == 'I':
-            m = ave - abs(d)  # indirect match
-        else:
-            m = min(param,_param) - abs(d)/2 - ave  # direct match
-            
-        return [d,m]
 
 
 
