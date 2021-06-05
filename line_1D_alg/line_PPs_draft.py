@@ -71,7 +71,8 @@ def search(P_):  # cross-compare patterns within horizontal line
         neg_M = vmP = sign = _sign = neg_L = 0  # initialization
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
-           
+            if _P.M < P.M:      #check if P is already compared
+                P._P_.append([_P,P])  #store consecutive Ps
             if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
                # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 

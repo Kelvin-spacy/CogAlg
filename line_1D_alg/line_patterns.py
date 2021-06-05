@@ -35,6 +35,7 @@ class CP(ClusterStructure):
     I = int
     D = int
     M = int
+    _P_ = list
     dert_ = list
     sub_layers = list
     smP = NoneType
