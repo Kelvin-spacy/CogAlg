@@ -71,7 +71,8 @@ def search(P_):  # cross-compare patterns within horizontal line
         neg_M = vmP = sign = _sign = neg_L = 0  # initialization
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
-            if P.layer0[3] + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
+           
+            if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
                # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 
                 derP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
@@ -106,7 +107,7 @@ def search(P_):  # cross-compare patterns within horizontal line
 
 def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_patterns
 
-    dC_ave = ave_M * ave_rM ** (1 + neg_L / P.layer0.L)  # average match projected at current distance: neg_L, add coef / var?
+    dC_ave = ave_M * ave_rM ** (1 + neg_L / P.L)  # average match projected at current distance: neg_L, add coef / var?
     layer1,param_name = P.layer0.comp_param(_P.layer0, ave=dC_ave)  # comp_param may need to be edited
 
     mP = layer1[0][1] + layer1[1][1] + layer1[2][1] + layer1[3][1]  # match(P, _P), no I: for regression to 0der only?
@@ -145,7 +146,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
 
     derP = CderP(sign=sign, mP=mP, dP=dP, neg_M=neg_M, neg_L=neg_L, P = P, layer1=layer1,layer1_param=param_name)
 
-    return derP, _P.layer0[0], _P.sign
+    return derP, _P.L, _P.sign
 
 
 
