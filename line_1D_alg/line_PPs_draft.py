@@ -66,13 +66,13 @@ ave_PPM = 200
 def search(P_):  # cross-compare patterns within horizontal line
 
     derP_ = []  # search forms array of alternating-sign derPs (derivatives + P): output of pair-wise comp_P
-
+    der_P_ = []
     for i, P in enumerate(P_):
         neg_M = vmP = sign = _sign = neg_L = 0  # initialization
 
         for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
-            if _P.M < P.M:      #check if P is already compared
-                P._P_.append([_P,P])  #store consecutive Ps
+            #if _P.M < P.M:      #check if P is already compared
+            #    P._P_.append([_P,P])  #store consecutive Ps
             if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
                # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 
@@ -102,6 +102,11 @@ def search(P_):  # cross-compare patterns within horizontal line
                         print('False sign in line' + str(y))
 
             PPm_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
+        for x0 in range(len(derP_)):
+            if x >=2 and len(derP_)>3:  # check 
+                _P_.append([derP_[x0-2].P,derP_[x0].P])  #set of P that has not been compared (__P,P)
+
+    
 
     return PPm_
 
@@ -115,7 +120,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
     dP = layer1[0][0] + layer1[1][0] + layer1[2][2] + layer1[3][0]  # difference(P,_P)
     # each m is a deviation, better absolute?
     if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
-
+    x0 = 'compared'
     sign = mP > 0
     if sign:  # positive forward match, compare sub_layers between P.sub_H and _P.sub_H:
         der_sub_H = []  # sub hierarchy, abbreviation for new sub_layers
