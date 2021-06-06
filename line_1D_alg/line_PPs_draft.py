@@ -102,9 +102,9 @@ def search(P_):  # cross-compare patterns within horizontal line
                         print('False sign in line' + str(y))
 
             PPm_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
-        for x0 in range(len(derP_)):
+        for x in range(len(derP_)):
             if x >=2 and len(derP_)>3:  # check 
-                _P_.append([derP_[x0-2].P,derP_[x0].P])  #set of P that has not been compared (__P,P)
+                _P_.append([derP_[x-2].P,derP_[x].P])  #set of P that has not been compared (__P,P)
 
     
 
