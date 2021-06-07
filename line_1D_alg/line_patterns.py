@@ -101,11 +101,13 @@ def form_Pm_(P_dert_):  # initialization, accumulation, termination
     _sign = dert.m > 0
     D = dert.d or 0
     L, I, M, dert_, sub_H = 1, dert.p, dert.m, [dert], []
+    ileft = 0
     # cluster P_derts by m sign
     for dert in P_dert_[1:]:
         sign = dert.m > 0
         if sign != _sign:  # sign change, terminate P
-            P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))
+            P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False,ileft=ileft))
+            ileft+=1
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset params
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, bilateral m: for eval per pixel
