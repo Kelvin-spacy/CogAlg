@@ -58,18 +58,18 @@ ave_PPM = 200
 def search(P_):  # cross-compare patterns within horizontal line
 
     derP_ = []  # search forms array of alternating-sign derPs (derivatives + P): output of pair-wise comp_P
-    __P = []
+    ileft_ = []
     for i, P in enumerate(P_):
         neg_M = vmP = sign = _sign = neg_L = 0  # initialization
-        for j, _P in enumerate(P_[i + 1:]):  # variable-range comp, no last-P displacement, just shifting first _P
+        for j, _P in enumerate(P_[i + 1:]):  # NOt sure if the notations are correct as P_[i+1:] represents next P not prior P i-e _P? variable-range comp, no last-P displacement, just shifting first _P
             if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
                 # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
 
                 derP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
                 if i >2: #avoid error at 1st and 2nd P
                     if i < _P.ileft: 
-                        _P.ileft = i  # index of left _P that P was compared to, not correct: must be initialized at X
-                        __P.append(P_[_P.ileft-2]) #skipping the consecutive left of _P
+                        ileft_.append(_P.ileft)  # index of left _P that P was compared to, not correct: must be initialized at X
+                        #__P.append(P_[_P.ileft-2]) #skipping the consecutive left of _P
 
                 # backward search should be at PP termination in form_PPm_, but indexes stored here?
 
@@ -83,12 +83,12 @@ def search(P_):  # cross-compare patterns within horizontal line
                     neg_L += _L   # accumulate distance to match
                     if j == len(P_):
                         # last P is a singleton derP, derivatives are ignored:
-                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, compared=True,neg_L=neg_L, P=P ))
+                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M,neg_L=neg_L, P=P ))
                     '''                     
                     no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
-                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, compared= False,neg_L=neg_L, P=P))
+                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
@@ -97,14 +97,40 @@ def search(P_):  # cross-compare patterns within horizontal line
                     if not derP.sign:  # check false sign
                         print('False sign in line' + str(y))
 
-    PPm_ = form_PPm_(derP_,__P)  # cluster derPs into PPms by the sign of mP
-    if len(__P) > 0:
-        for _PP in PPm_:
-            for i,P in enumerate(__P):
-                for j,_P in enumerate(PP.P_):
-                    _PPm_ = search_backward(P,_P)   #need to define search_backward()
+    PPm_ = form_PPm_(derP_,ileft_,P_)  # cluster derPs into PPms by the sign of mP
+    
+    return PPm_
 
-    return PPm_, _PPm_
+def back_search_extend(P,_P):
+    derP_ = []
+    if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
+        # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
+
+        derP, _L, _sign = comp_P(P, _P, neg_M, neg_L)
+        sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.P
+        if sign:
+            derP_.append(derP)
+            break  # nearest-neighbour search is terminated by first match
+        else:
+            neg_M += vmP  # accumulate contiguous miss: negative mP
+            neg_L += _L   # accumulate distance to match
+            if j == len(P_):
+                # last P is a singleton derP, derivatives are ignored:
+                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M,neg_L=neg_L, P=P ))
+            '''                     
+            no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
+            neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
+    else:
+        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M,neg_L=neg_L, P=P))
+        # sign is ORed bilaterally, negative for singleton derPs only
+        break  # neg net_M: stop search
+
+    if derP_:
+        for derP in derP_:
+            if not derP.sign:  # check false sign
+                print('False sign in line' + str(y))
+    return derP_
+
 
 
 
@@ -160,7 +186,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _sign = 0 in line_
     return derP, _P.L, _P.sign
 
 
-def form_PPm_(derP_,__P):  # cluster derPs into PPm s by mP sign, eval for div_comp per PPm
+def form_PPm_(derP_,ileft_,P_):  # cluster derPs into PPm s by mP sign, eval for div_comp per PPm
 
     PPm_ = []
     derP = derP_[0]  # 1st derP
@@ -170,6 +196,13 @@ def form_PPm_(derP_,__P):  # cluster derPs into PPm s by mP sign, eval for div_c
     for i, derP in enumerate(derP_, start=1):
         if derP.sign != PP.sign:  # sign != _sign: same-sign derPs in PP
             # terminate PPm:
+            if len(ileft_) > 0:
+                for P in PP.P_:
+                    for ileft in ileft_:
+                        for x in range(ileft, 0, -1): #backward search
+                            derP_bx.append(back_search_extend(P,P_[x]))
+                            
+
             PPm_.append(PP)
             PP = CPP( P_=[derP.P], inherit=[derP.P, derP])  # reinitialize PPm with current derP
         else:
