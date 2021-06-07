@@ -22,7 +22,7 @@ import argparse
 from time import time
 from utils import *
 from itertools import zip_longest
-from class_cluster import ClusterStructure, NoneType
+from class_cluster import ClusterStructure, NoneType, comp_param, comp_param_complex, Cdm
 
 class Cdert(ClusterStructure):
     p = int
@@ -30,16 +30,16 @@ class Cdert(ClusterStructure):
     m = int
 
 class CP(ClusterStructure):
+
     sign = NoneType
     L = int
     I = int
     D = int
     M = int
-    _P_ = list
     dert_ = list
     sub_layers = list
-    smP = NoneType
-    fdert = NoneType
+    fdert = bool
+    ileft = int  # index of left _P that P was compared to, initialize at max X?
 
 # pattern filters or hyper-parameters: eventually from higher-level feedback, initialized here as constants:
 
@@ -160,10 +160,9 @@ def form_adjacent_M_(Pm_):  # compute array of adjacent Ms, for contrastive borr
 
 ''' 
     Recursion in intra_P extends pattern with sub_: hierarchy of sub-patterns, to be adjusted by macro-feedback:
-    P:
+    # P:
     sign,  # of m | d 
-    Dert = L, I, D, M, 
-    dert_, # input for extended cross-comp
+    dert_, # buffer of elements, input for extended cross-comp
     # next fork:
     fPd, # flag: select Pd vs. Pm forks in form_P_
     fid, # flag: input is derived: magnitude correlates with predictive value: m = min-ave, else m = ave-|d|
@@ -341,15 +340,14 @@ if __name__ == "__main__":
     image = image.astype(int)
 
     start_time = time()
-    fline_PPs = 0
     # Main
     frame_of_patterns_ = cross_comp(image)  # returns Pm__
 
-    from line_PPs_draft import *
+    fline_PPs = 0
+    if fline_PPs:  # debug line_PPs_draft
+        from line_PPs_draft import *
+        frame_PPm_ = []
 
-    frame_dert_P_ = []
-    frame_PPm_ = []
-    if fline_PPs:  # debug line_PPs
         for y, P_ in enumerate(frame_of_patterns_):
             PPm_ = search(P_)
             frame_PPm_.append(PPm_)
