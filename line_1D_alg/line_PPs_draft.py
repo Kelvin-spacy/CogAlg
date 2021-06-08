@@ -217,8 +217,8 @@ def back_search_extend( PPm_, P_):  # evaluate for the 1st P in PP, merge with _
                     if not derP.sign:  # check false sign
                         print('False sign in line' + str(y))
         for derP in derp_:
-            derP.PP = CPP(P_=[derP.P],inherit=[derP])
-            #not sure how to merge in PPm_ and where. do we need to accumulate all the derP.PP ?
+            if derP.P not in PP.P_:
+                PP.P_.append([derP.P])
 
     return PPm_
 
