@@ -17,12 +17,17 @@
   The former should be used in rng_comp and the latter in der_comp, which may alternate with intra_P.
 '''
 
+# add ColAlg folder to system path
+import sys
+from os.path import dirname, join, abspath
+sys.path.insert(0, abspath(join(dirname("CogAlg"), '..')))
+
 import cv2
 import argparse
 from time import time
 from utils import *
 from itertools import zip_longest
-from class_cluster import ClusterStructure, NoneType, comp_param, comp_param_complex, Cdm
+from frame_2D_alg.class_cluster import ClusterStructure, NoneType, comp_param, Cdm
 
 class Cdert(ClusterStructure):
     p = int
@@ -31,15 +36,17 @@ class Cdert(ClusterStructure):
 
 class CP(ClusterStructure):
 
-    sign = NoneType
+    sign = bool
+    _sign = bool  # temporary, for
     L = int
     I = int
     D = int
     M = int
     dert_ = list
     sub_layers = list
-    fdert = bool
-    ileft = int  # index of left _P that P was compared to, initialize at max X?
+    fdert = bool  # forgot
+    ileft = int=1024  # index of left-most _P that P was compared to in line_PPs, initialize at max X?
+
 
 # pattern filters or hyper-parameters: eventually from higher-level feedback, initialized here as constants:
 
@@ -101,13 +108,11 @@ def form_Pm_(P_dert_):  # initialization, accumulation, termination
     _sign = dert.m > 0
     D = dert.d or 0
     L, I, M, dert_, sub_H = 1, dert.p, dert.m, [dert], []
-    ileft = 0
     # cluster P_derts by m sign
     for dert in P_dert_[1:]:
         sign = dert.m > 0
         if sign != _sign:  # sign change, terminate P
-            P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False,ileft=ileft))
-            ileft+=1
+            P_.append(CP(sign=_sign, L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, smP=False, fdert=False))
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset params
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, bilateral m: for eval per pixel
