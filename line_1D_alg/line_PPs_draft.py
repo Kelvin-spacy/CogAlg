@@ -185,8 +185,42 @@ def back_search_extend( PPm_, P_):  # evaluate for the 1st P in PP, merge with _
 
     # search by PP.P_[0] over P_, starting from PP.P_[0].ileft,
     # as in forward search() but with decreasing indices.
+    derP_ = []
+    for PP in PPm_:
+        neg_M = vmP = sign = _sign = neg_L = 0
+        for x in range(PP.P_[0].ileft, 0, -1): #backward search
 
-    pass
+            if P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st _P, no selection by M sign
+                # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
+
+                derP, _L, _sign = comp_P(PP.P_[0], P_[x], neg_M, neg_L)
+                sign, vmP, neg_M, neg_L, P = derP.sign, derP.mP, derP.neg_M, derP.neg_L, derP.P
+                if sign:
+                    derP_.append(derP)
+                    break  # nearest-neighbour search is terminated by first match
+                else:
+                    neg_M += vmP  # accumulate contiguous miss: negative mP
+                    neg_L += _L   # accumulate distance to match
+                    if x == 0:
+                        # first P is a singleton derP, derivatives are ignored:
+                        derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M,neg_L=neg_L, P=P ))
+                    '''                     
+                    no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
+                    neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
+            else:
+                derP_.append(CderP(sign=sign or _sign, mP=vmP, neg_M=neg_M,neg_L=neg_L, P=P))
+                # sign is ORed bilaterally, negative for singleton derPs only
+                break  # neg net_M: stop search
+
+            if derP_:
+                for derP in derP_:
+                    if not derP.sign:  # check false sign
+                        print('False sign in line' + str(y))
+        for derP in derp_:
+            derP.PP = CPP(P_=[derP.P],inherit=[derP])
+            #not sure how to merge in PPm_ and where. do we need to accumulate all the derP.PP ?
+
+    return PPm_
 
 
 def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division between element Ps
