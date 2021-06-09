@@ -186,7 +186,7 @@ def back_search_extend( PPm_, P_):  # evaluate for the 1st P in PP, merge with _
     # search by PP.P_[0] over P_, starting from PP.P_[0].ileft,
     # as in forward search() but with decreasing indices.
     derP_ = []
-    for PP in PPm_:
+    for i,PP in enumerate(PPm_):
         neg_M = vmP = sign = _sign = neg_L = 0
         for x in range(PP.P_[0].ileft, 0, -1): #backward search
 
@@ -217,8 +217,10 @@ def back_search_extend( PPm_, P_):  # evaluate for the 1st P in PP, merge with _
                     if not derP.sign:  # check false sign
                         print('False sign in line' + str(y))
         for derP in derp_:
-            if derP.P not in PP.P_:
-                PP.P_.append([derP.P])
+            if derP.P not in PPm_[i].P_:
+                if derP.sign > 0:
+                    PPm_[i] = CPP( P_=[derP.P], inherit=[derP])
+
 
     return PPm_
 
