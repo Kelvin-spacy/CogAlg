@@ -180,6 +180,15 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
 
     return PPm_
 
+def form_PPd(PPm_,derP_): 
+    #Compare dPs when they have high value than ave. diff doesn't have independent value
+    #contrastive borrow from adjacent M i-e _PP.mP(_PP.mP+_PP.M)? How much raw value abs(dP) can borrow from adjacent match
+    #Criteria of forming PPd - PP.mP(PP.mP+PP.M)*abs(derP.dP) > ave ?
+    # terminate PPd when ?
+
+    PPd_ = []
+
+
 
 def back_search_extend( PPm_, P_):  # evaluate for the 1st P in PP, merge with _P.PP if any
 
