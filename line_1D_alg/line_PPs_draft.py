@@ -54,8 +54,10 @@ class CPP(CderP):
     layer1 = list
     add_comparands = list
     sign = bool
-    P_ = list  #  maybe sub_PPm_
+    derP_ = list  # this needs to be checked
+    # maybe sub_PPm_
     replace = {'ileft': (None, None)}
+
 
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -102,9 +104,9 @@ def search(P_):  # cross-compare patterns within horizontal line
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
-    PPm_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
+    PPm_,derP_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
 
-    PPm_ = back_search_extend( PPm_, derP_, P_)  # evaluate for 1st P in each PP, merge with _P.PP if any
+    PPm_ = back_search_extend( derP_)  # evaluate for 1st P in each PP, merge with _P.PP if any
 
     return PPm_
 
@@ -172,7 +174,7 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
 
     PPm_ = []
     derP = derP_[0]  # 1st derP
-    PP = CPP( P_=[derP.P], inherit=[derP])  # initialize PP with 1st derP params
+    PP = CPP( derP_=[derP], inherit=[derP])  # initialize PP with 1st derP params
     derP.PP = PP  # PP that derP belongs to, for merging PPs in back_search_extend
     # positive PPms only, miss over discontinuity is expected, contrast dP -> PPd: if PP.mP * abs(dP) > ave_dP: explicit borrow only?
 
@@ -180,10 +182,9 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
         if derP.sign != PP.sign:  # sign != _sign: same-sign derPs in PP
             # terminate PPm:
             PPm_.append(PP)
-            PP = CPP( P_=[derP.P], inherit=[derP])  # reinitialize PPm with current derP
+            PP = CPP( derP_=[derP], inherit=[derP])  # reinitialize PPm with current derP
             derP.PP = PP  # PP that derP belongs to, for merging PPs in back_search_extend
         else:
-            PP.accum_from(derP.P)
             PP.accum_from(derP)  # accumulate PPm numerical params with same-name current derP params, exclusions?
 
     PPm_.append(PP)  # pack last PP
@@ -191,34 +192,39 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
     return PPm_
 
 
-def back_search_extend( PPm_, derP_):  # evaluate for the 1st P in PP, merge with _P.PP if any
+def back_search_extend( PPm_, derP_):  # each P should form derP, evaluate for the 1st P in PP, merge with _P.PP if any
 
-    # search by PP.P_[0] over P_, starting from PP.P_[0].ileft,
-    # as in forward search() but with decreasing indices.
-    for i,PP in enumerate(PPm_):
-        illeft = PP.P_[0].ileft -1  # might be wrong
-        derP = derP_[illeft]
-        while ileft >0:
-            while PP.P_[0].M + derP.neg_M > 0:
+    # search by PP.P_[0] over P_, starting from PP.P_[0].ileft, as in forward search() but with decreasing indices.
+
+    for PP in PPm_:
+        neg_M = vmP = sign = _sign = neg_L = 0
+        derP = PP.derP_[0]
+        illeft = PP.derP_[0].ileft - 1
+
+        while illeft > 0:
+            _derP = derP_[ PP.derP_[0].illeft ]
+
+            while (derP.P.M + neg_M > 0):  # _derP is assigned to P previous in P_?
                 illeft -= 1
-                derP = derP_[illeft]  # and so on.
-                _derP, _L, _sign = comp_P(PP.P_[0], derP.P, derP.neg_M, derP.neg_L)
-                sign, vmP, neg_M, neg_L, P = _derP.sign, _derP.mP, _derP.neg_M, _derP.neg_L, _derP.P
-                if sign: 
-                    #P_[ileft-1]._sign = True
-                    derP_[ileft-1] = _derP
-                    #merge
-                    if _derP.P not in PPm_[i].P_:
-                        PPm_[i] = CPP( P_=[_derP.P], inherit=[_derP]) #merge here
-                    break
-                else:
-                    neg_M += vmP  # accumulate contiguous miss: negative mP
-                    neg_L += _L   # accumulate distance to match
+                _derP, _L, _sign = comp_P(derP.P, derP_[illeft].P, neg_M, neg_L)
+                neg_M, neg_L = derP.neg_M, derP.neg_L
+                # no need for _L, _sign? #yes i thing no need for _L and _sign
+                if _derP.sign:
+                    derP_[illeft] = _derP  # add separate leftward derP?
+                    #merge(derP.PP, _derP.PP) #no need for separate function, got positive _derP
+                    _derP.PP.accum_from(derP.PP)  
+
+                    break  # nearest-neighbour search is terminated by first match
                     
+                else:
+                    neg_M += _derP.mP  # accumulate contiguous miss: negative mP
+                    neg_L += _L   # accumulate distance to match
             break
 
     
     return PPm_
+
+
 
 
 def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division between element Ps
