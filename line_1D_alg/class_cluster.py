@@ -308,7 +308,7 @@ def comp_param(param, _param, param_name, ave):
     if param_name == 'I':
         m = ave - abs(d)  # indirect match
     else:
-        m = min(param,_param) - abs(d)/2 - ave  # direct match
+        m = min(param,_param) - ave  # direct match
 
     return Cdm(d,m)
 
