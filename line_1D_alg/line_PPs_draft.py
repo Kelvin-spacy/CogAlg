@@ -38,6 +38,7 @@ from frame_2D_alg.class_cluster import ClusterStructure, comp_param
 class CderP(ClusterStructure):
 
     sign = bool
+    rrdn =int 
     mP = int
     dP = int
     neg_M = int
@@ -114,7 +115,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
     #    dm = comp_param(param, _param, [], DC_ave)     #compare mean params
     #    layer1.append([dm.d, dm.m])
     #    mP += dm.m; dP += dm.d
-
+    
     for (param, _param) in zip([P.I, P.L, P.D, P.M], [_P.I, _P.L, _P.D, _P.M]):
         dm = comp_param(param, _param, [], DC_ave)
         layer1.append([dm.d, dm.m])
@@ -166,7 +167,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
 
     derP = CderP(sign=sign, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P, layer1=layer1)
     P.derP = derP
-
+    div_derP_ = div_comp_P(P,_P) 
     return derP, _P.L, _P.sign
 
 
@@ -205,7 +206,7 @@ def form_PPd(PPm_,derP_):
     PPd_ = []
 
 
-def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division between element Ps
+def div_comp_P(P,P_):  # draft, check all PPs for x-param comp by division between element Ps
     '''
     div x param if projected div match: compression per PP, no internal range for ind eval.
     ~ (L*D + L*M) * rm: L=min, positive if same-sign L & S, proportional to both but includes fractional miss
@@ -213,54 +214,58 @@ def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division betwee
     also + ML * MS: redundant unless min or converted?
     vs. norm param: Var*rL-> comp norm param, simpler but diffs are not L-proportional?
     '''
-    for PP in PP_:
-        if PP.M / (PP.L + PP.I + abs(PP.D) + abs(PP.dM)) * (abs(PP.dL) + abs(PP.dI) + abs(PP.dD) + abs(PP.dM)) > ave_div:
-            # if irM * D_vars: match rate projects der and div match,
-            # div if scale invariance: comp x dVars, signed
-            ''' 
-            | abs(dL + dI + dD + dM): div value ~= L, Vars correlation: stability of density, opposite signs cancel-out?
-            | div_comp value is match: min(dL, dI, dD, dM) * 4, | sum of pairwise mins?
-            '''
-            _derP = PP.derP_[0]
-            # sign, vmP, neg_M, neg_L, iP, mL, dL, mI, dI, mD, dD, mM, dM = P,
-            # old:
-            _sign, _L, _I, _D, _M, _dert_, _sub_H, __sign = _derP[4]
+    
+    if PP.M / (PP.L + PP.I + abs(PP.D) + abs(PP.dM)) * (abs(PP.dL) + abs(PP.dI) + abs(PP.dD) + abs(PP.dM)) > ave_div:
+        # if irM * D_vars: match rate projects der and div match,
+        # div if scale invariance: comp x dVars, signed
+        ''' 
+        | abs(dL + dI + dD + dM): div value ~= L, Vars correlation: stability of density, opposite signs cancel-out?
+        | div_comp value is match: min(dL, dI, dD, dM) * 4, | sum of pairwise mins?
+        '''
+        div_derP_ = []
+        layer1 = []
+        # sign, vmP, neg_M, neg_L, iP, mL, dL, mI, dI, mD, dD, mM, dM = P,
+        # old:
+        #_sign, _L, _I, _D, _M, _dert_, _sub_H, __sign = _derP.P
 
-            for i, derP in enumerate(PP.derP_[1:]):
-                sign, L, I, D, M, dert_, sub_H, _sign = derP[4]
-                # DIV comp L, SUB comp (summed param * rL) -> scale-independent d, neg if cross-sign:
-                rL = L / _L
-                # mL = whole_rL * min_L?
-                dI = I * rL - _I  # rL-normalized dI, vs. nI = dI * rL or aI = I / L
-                mI = ave - abs(dI)  # I is not derived, match is inverse deviation of miss
-                dD = D * rL - _D  # sum if opposite-sign
-                mD = min(D, _D)   # same-sign D in dP?
-                dM = M * rL - _M  # sum if opposite-sign
-                mM = min(M, _M)   # - ave_rM * M?  negative if x-sign, M += adj_M + deep_M: P value before layer value?
+        #sign, L, I, D, M, dert_, sub_H, _sign = derP[4]
+        # DIV comp L, SUB comp (summed param * rL) -> scale-independent d, neg if cross-sign:
+        rL = P.L / _P.L
+        # mL = whole_rL * min_L?
+        for (param, _param) in zip([P.I, P.D, P.M], [_P.I, _P.D, _P.M]):
+            dm = comp_param(param, _param, [], ave, rL)
+            layer1.append([dm.d, dm.m])
+            mP += dm.m; dP += dm.d
+    
+        if mP > P.derP.mP:
+            rrdn = 1  # added to rdn, or diff alt, olp, div rdn?
+        else:
+            rrdn = 2
+        if mP > ave * 3 * rrdn: #not sure what this means
+            rvars = layer1  # redundant vars: dPP_rdn, ndPP_rdn, assigned in each fork?
+        else:
+            rvars = []
+        # append rrdn and ratio variables to current derP:
+        P.derP = CderP(rrdn=rrdn,layer1=rvars)
+        # P vars -> _P vars:
+        _P = P
 
-                mP = mI + mM + mD  # match(P, _P) for derived vars, defines norm_PPm, no ndx: single, but nmx is summed
-                if mP > derP[1]:
-                    rrdn = 1  # added to rdn, or diff alt, olp, div rdn?
-                else:
-                    rrdn = 2
-                if mP > ave * 3 * rrdn:
-                    rvars = mP, mI, mD, mM, dI, dD, dM  # redundant vars: dPP_rdn, ndPP_rdn, assigned in each fork?
-                else:
-                    rvars = []
-                # append rrdn and ratio variables to current derP:
-                PP.derP_[i] += [rrdn, rvars]
-                # P vars -> _P vars:
-                _sign = sign, _L = L, _I = I, _D = D, _M = M, _dert_ = dert_, _sub_H = sub_H, __sign = _sign
-                '''
-                m and d from comp_rate is more accurate than comp_norm?
-                rm, rd: rate value is relative? 
-                
-                also define Pd, if strongly directional? 
-                   
-                if dP > ndP: ndPP_rdn = 1; dPP_rdn = 0  # value = D | nD
-                else:        dPP_rdn = 1; ndPP_rdn = 0
-                '''
-    return PP_
+        if dP > P.derP.dP: ndP_rdn = 1; dP_rdn = 0  #Not sure what to do with these
+        else: dP_rdn = 1; ndP_rdn = 0          
+
+
+        div_derP_.append(P.derP)
+
+        '''
+        m and d from comp_rate is more accurate than comp_norm?
+        rm, rd: rate value is relative? 
+        
+        also define Pd, if strongly directional? 
+           
+        if dP > ndP: ndPP_rdn = 1; dPP_rdn = 0  # value = D | nD
+        else:        dPP_rdn = 1; ndPP_rdn = 0
+        '''
+    return div_derP_
 
 
 def intra_PPm_(PPm_, rdn):
