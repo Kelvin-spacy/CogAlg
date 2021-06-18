@@ -81,6 +81,7 @@ def search(P_):  # cross-compare patterns within horizontal line
 
                 derP, _L, _smP = comp_P(P, _P, neg_M, neg_L)
                 sign, mP, dP, neg_M, neg_L, P = derP.sign, derP.mP, derP.dP, derP.neg_M, derP.neg_L, derP.P
+                derP_d_.append(derP)    #form derP_d_ for each consecutive pair P,_P
 
                 if sign:
                     P_[i + 1 + j]._smP = True  # backward match per P, or set _smP in derP_ with empty CderPs?
@@ -97,10 +98,12 @@ def search(P_):  # cross-compare patterns within horizontal line
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
                 derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
+                der_d_.append(CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
 
     PPm_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
+    PPd_ = form_PPd_(derP_d_)
 
     return PPm_
 
@@ -196,27 +199,87 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
     return PPm_
 
 
-def form_PPd(PPm_,derP_):   #Where should it called from
+def form_PPd(derP_d_):   #Where should it called from
     '''
     Compare dPs when they have high value than ave. diff doesn't have independent value
     contrastive borrow from adjacent M i-e _PP.mP(_PP.mP+_PP.M)? How much raw value abs(dP) can borrow from adjacent match
     Criteria of forming PPd - PP.mP(PP.mP+PP.M)*abs(derP.dP) > ave ?
     '''
     PPd_ = []
-    PP = PPm_[0]
-    for i,derP in enumerate(derP_):
-        if PP.mP + PP.M * abs(derP.dP) > ave:  #dP_ave?
-            #terminate PPd
-            PPd_.append(PP)
-            PP = PPm_[i]
-        else:
-            PP.accum_from(derP.P)
-            PP.accum_from(derP)
+    derP_d = derP_d_[0]
+    PP = CPP( derP_=[derP_d],inherit=([derP_d.P],[derP_d]) )  
+    PP.derP = derP_d 
 
+    for i, derP_d in enumerate(derP_d_, start=1):
+        if derP_d.mP + derP_d.M * abs(derP_d.dP) > ave: 
+            # terminate PPd:
+            PPd_.append(PP)
+            PP = CPP( derP_=[derP_d], inherit=([derP_d.P],[derP_d]) )  
+            PP.derP = derP_d
+            derP_d.PP = PP  
+        else:
+            PP.accum_from(derP_d.P)
+            PP.accum_from(derP_d)  
+
+    PPm_.append(PP)  
     return PPd_
 
+def form_PPd(PPm_,P_):   #vdP version
+    '''
+    Compare dPs when they have high value than ave. diff doesn't have independent value
+    contrastive borrow from adjacent M i-e _PP.mP(_PP.mP+_PP.M)? How much raw value abs(dP) can borrow from adjacent match
+    Criteria of forming PPd - PP.mP(PP.mP+PP.M)*abs(derP.dP) > ave ?
+    '''
+    PPd_ = []
 
+    #form derP_d_ if consecutive _P,P -> vdP==True
+    _PP = PPm_[0]
+    _P = P_[0]
+    _vdP = _P.M + PPm_[1].mP / ( len(_PP.derP_) * abs(_PP.dP)   #first vdP based on next adjacent PP.mP
+    for i, P in enumerate(P_[1:]):
+        neg_M = neg_L = mP = sign = dP =_smP = 0
+        mP = dP = 0
+        layer1 = []
+        L= P.L; _L=_P.L
+        DC_ave = ave_M * ave_rM ** (1 + neg_L / P.L)
 
+        for (param, _param) in zip([P.I, P.L, P.D, P.M], [_P.I, _P.L, _P.D, _P.M]):
+            dm = comp_param(param, _param, [], DC_ave)
+            layer1.append([dm.d, dm.m])
+            mP += dm.m; dP += dm.d
+
+        for j,PP in enumerate(PPm_,start=1):
+            vdP = P.M + PPm_[j+1].mP / ( len(PP.derP_) * abs(PP.dP)
+                if _vdP >0 and vdP > 0:
+                    sign = True
+                    derP_d_.append(CderP(sign=sign, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P, layer1=layer1))
+                    _P = P
+                    break
+                else:
+                    
+                    neg_M += mP  
+                    neg_L += _L  
+                    if j == len(P_):  
+                        derP_d_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
+
+    #form PPd
+    derP_d = derP_d_[0]
+    PP = CPP( derP_=[derP_d],inherit=([derP_d.P],[derP_d]) )  
+    PP.derP = derP_d 
+
+    for i, derP_d in enumerate(derP_d_, start=1):
+        if derP_d.mP + derP_d.M * abs(derP_d.dP) > ave: 
+            # terminate PPd:
+            PPd_.append(PP)
+            PP = CPP( derP_=[derP_d], inherit=([derP_d.P],[derP_d]) )  
+            PP.derP = derP_d
+            derP_d.PP = PP  
+        else:
+            PP.accum_from(derP_d.P)
+            PP.accum_from(derP_d)  
+
+    PPm_.append(PP)  
+    return PPd_
 
 
 
