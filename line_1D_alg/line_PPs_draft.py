@@ -43,6 +43,7 @@ class CderP(ClusterStructure):
     dP = int
     neg_M = int
     neg_L = int
+    adj_mP = int
     P = object
     layer1 = list  # d, m per comparand
     PP = object  # PP that derP belongs to, for merging PPs in back_search_extend, Not sure if its relevant now
@@ -81,7 +82,8 @@ def search(P_):  # cross-compare patterns within horizontal line
 
                 derP, _L, _smP = comp_P(P, _P, neg_M, neg_L)
                 sign, mP, dP, neg_M, neg_L, P = derP.sign, derP.mP, derP.dP, derP.neg_M, derP.neg_L, derP.P
-
+                
+                derP_d_.append(derP)
                 if sign:
                     P_[i + 1 + j]._smP = True  # backward match per P, or set _smP in derP_ with empty CderPs?
                     derP_.append(derP)
@@ -97,49 +99,33 @@ def search(P_):  # cross-compare patterns within horizontal line
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
                 derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
+                derP_d_.append(CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
     #Sequence for calculating derP_d_
 
-    derP_adjmP_ = form_adjacent_mP(derP_)
+    derP_adjmP_ = form_adjacent_mP(derP_d_)
 
-    for i, P in enumerate(P_):
-        neg_M = neg_L = mP = sign = dP =_smP = 0  # initialization
-
-        for j, _P in enumerate(P_[i + 1:]):
-            derP_d, _L, _smP = comp_P(P, _P, neg_M, neg_L)
-            sign, mP, dP, neg_M, neg_L, P = derP.sign, derP.mP, derP.dP, derP.neg_M, derP.neg_L, derP.P
-            lend = P.M + (derP_adjmP_[i].mP) / 2
-            vdP = lend * abs(dP) - ave_vdP  #ave_vdP=?
-            if vdP >0:
-                derP_d_.append(derP_d)
-                break
-            else:
-                neg_M += mP  
-                neg_L += _L  
-                if j == len(P_):  
-                    derP_d_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
-
+    
 
     PPm_ = form_PPm_(derP_)  # cluster derPs into PPms by the sign of mP
-    PPd_ = form_PPd_(derP_d_)
+    PPd_ = form_PPd_(derP_adjmP_)
 
     return PPm_
 
-def form_adjacent_mP(derP_):  
+def form_adjacent_mP(derP_d_):  
 
-    pri_mP = derP_[0].mP  
-    mP = derP_[1].mP
-    derP_[0].adj_mP = [derP_[1].mP]  
+    pri_mP = derP_d_[0].mP  
+    mP = derP_d_[1].mP
+    derP_d_[0].adj_mP = derP_d_[1].mP  
 
-    for i,derP in enumerate(derP_[2:]):
+    for i,derP in enumerate(derP_d_[2:]):
         next_mP = derP.mP
-        adj_M_.append()  # exclude M
-        derP_[i+1].mP = pri_mP + next_mP
+        derP_d_[i+1].adj_mP = (pri_mP + next_mP)/2
         pri_mP = mP
         mP = next_mP
 
-    return derP_
+    return derP_d_
 
 
 def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_patterns
@@ -157,6 +143,7 @@ def comp_P(P, _P, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_p
         dm = comp_param(param, _param, [], DC_ave)
         layer1.append([dm.d, dm.m])
         mP += dm.m; dP += dm.d
+    
     '''
     Draft
     rel_distance = (P.x0 - (_P.x0 +_P.L)) / P.L  # tentative
@@ -235,7 +222,7 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
     return PPm_
 
 
-def form_PPd(derP_d_): 
+def form_PPd_(derP_d_): 
     '''
     Compare dPs when they have high value than ave. diff doesn't have independent value
     contrastive borrow from adjacent M i-e _PP.mP(_PP.mP+_PP.M)? How much raw value abs(dP) can borrow from adjacent match
@@ -247,7 +234,7 @@ def form_PPd(derP_d_):
     PP.derP = derP_d 
 
     for i, derP_d in enumerate(derP_d_, start=1):
-        if derP_d.mP + derP_d.M * abs(derP_d.dP) > ave:     #adj_mP required here?
+        if derP_d.adj_mP + derP_d.P.M * abs(derP_d.dP) > ave:     #adj_mP required here?
             # terminate PPd:
             PPd_.append(PP)
             PP = CPP( derP_=[derP_d], inherit=([derP_d.P],[derP_d]) )  
@@ -257,7 +244,7 @@ def form_PPd(derP_d_):
             PP.accum_from(derP_d.P)
             PP.accum_from(derP_d)  
 
-    PPm_.append(PP)  
+    PPd_.append(PP)  
     return PPd_
 
 
