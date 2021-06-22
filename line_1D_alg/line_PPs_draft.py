@@ -99,7 +99,6 @@ def search(P_):  # cross-compare patterns within horizontal line
                     neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
             else:
                 derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
-                derP_d_.append(CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
                 # sign is ORed bilaterally, negative for singleton derPs only
                 break  # neg net_M: stop search
     #Sequence for calculating derP_d_
@@ -144,7 +143,7 @@ def comp_P(P, _P, neg_M, neg_L, P_):  # multi-variate cross-comp, _smP = 0 in li
         layer1.append([dm.d, dm.m])
         mP += dm.m; dP += dm.d
     
-    
+
     rel_distance = (P.x0 - (_P.x0 +_P.L)) / P.L  # tentative
 
     dm = comp_param(P.dert_[0].p, _P.dert_[-1].p, 'I', ave)
@@ -152,11 +151,15 @@ def comp_P(P, _P, neg_M, neg_L, P_):  # multi-variate cross-comp, _smP = 0 in li
 
     if mP / rel_distance > ave_merge:
         merge(_P, P)  # splice proximate and param/L- similar Ps
-        re_search (_P, P_)
-        #P_.extend([_P]) #extend will add it to last but insert can add it to a specific index - will be searched automatically?
+        i = P_.index(P)
+        if _P.M + neg_M > 0:
+            P = _P
+            _P = P_[i+1]
+            derP, _L, _smP = comp_P(P, _P, neg_M, neg_L, P_)
+        else:
+            derP = CderP(sign=_P.sign , mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=_P)
 
     else: 
-    
         # match(P,_P), ave_M is addition to ave? or abs for projection in search?
         if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
 
@@ -189,29 +192,10 @@ def comp_P(P, _P, neg_M, neg_L, P_):  # multi-variate cross-comp, _smP = 0 in li
                         else:
                             break  # deeper P and _P sub_layers are from different intra_comp forks, not comparable?
 
-    derP = CderP(sign=sign, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P, layer1=layer1)
-    P.derP = derP
+        derP = CderP(sign=sign, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P, layer1=layer1)
+        P.derP = derP
 
     return derP, _P.L, _P.sign
-
-
-def re_search(_P,P_):   #not sure about this what to do with the derP obtained here
-    for P in P_:
-        if P.M + neg_M > 0:
-            derP, _L, _smP = comp_P(P, _P, neg_M, neg_L, P_)
-            sign, mP, dP, neg_M, neg_L, P = derP.sign, derP.mP, derP.dP, derP.neg_M, derP.neg_L, derP.P
-            if sign:
-                    derP_.append(derP)
-                    break
-                else:
-                    neg_M += mP  
-                    neg_L += _L  
-                    if j == len(P_):
-                        derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
-            else:
-                derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=P))
-                break  
-
 
 
 def merge(_P,P):
@@ -220,6 +204,7 @@ def merge(_P,P):
     _P.D+=P.D
     _P.M+=P.M
     _P.dert_.append([P.dert_])
+
 
 def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp per PPm
 
@@ -273,7 +258,7 @@ def form_PPd_(derP_d_):
 
 
 
-def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division between element Ps
+def div_comp_P(PPd_):  # draft, check all PPs for x-param comp by division between element Ps
     '''
     div x param if projected div match: compression per PP, no internal range for ind eval.
     ~ (L*D + L*M) * rm: L=min, positive if same-sign L & S, proportional to both but includes fractional miss
@@ -281,14 +266,16 @@ def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division betwee
     also + ML * MS: redundant unless min or converted?
     vs. norm param: Var*rL-> comp norm param, simpler but diffs are not L-proportional?
     '''
-    for PP in PP_:
-        if PP.M / (PP.L + PP.I + abs(PP.D) + abs(PP.dM)) * (abs(PP.dL) + abs(PP.dI) + abs(PP.dD) + abs(PP.dM)) > ave_div:
+    for PP in PPd_:
+        if PP.M / (PP.L + PP.I + abs(PP.D) + abs(PP.dM)) * (abs(PP.dL) + abs(PP.dI) + abs(PP.dD) + abs(PP.dM)) > ave_div: #need PP.adj_mP here?
             # if irM * D_vars: match rate projects der and div match,
             # div if scale invariance: comp x dVars, signed
             ''' 
             | abs(dL + dI + dD + dM): div value ~= L, Vars correlation: stability of density, opposite signs cancel-out?
             | div_comp value is match: min(dL, dI, dD, dM) * 4, | sum of pairwise mins?
             '''
+            layer1 = []
+            mP=dP=0
             _derP = PP.derP_[0]
             # smP, vmP, neg_M, neg_L, iP, mL, dL, mI, dI, mD, dD, mM, dM = P,
             #_sign, _L, _I, _D, _M, _dert_, _sub_H, __smP = _derP.P
@@ -314,7 +301,7 @@ def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division betwee
                     mP += dm.m; dP += dm.d
 
                 if dP > P.derP.dP: 
-                    ndP_rdn = 1; dP_rdn = 0  #Not sure what to do with these
+                    ndP_rdn = 1; dP_rdn = 0  # Not sure what to do with these
                 else: 
                     dP_rdn = 1; ndP_rdn = 0  
 
@@ -341,7 +328,7 @@ def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division betwee
                 if dP > ndP: ndPP_rdn = 1; dPP_rdn = 0  # value = D | nD
                 else:        dPP_rdn = 1; ndPP_rdn = 0
                 '''
-    return PP_
+    return PPd_
 
 
 
