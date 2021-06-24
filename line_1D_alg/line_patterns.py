@@ -81,7 +81,7 @@ def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patter
         __p, _p = pixel_[0:2]  # each prefix '_' denotes prior
         _d = _p - __p  # initial comparison
         _m = ave - abs(_d)
-        dert_.append( Cdert(p=__p, d=None, m=(_m + _m / 2)))  # project _m to bilateral m, first dert is for comp_P only?
+        dert_.append( Cdert(p=__p, d=0, m=(_m + _m / 2)))  # project _m to bilateral m, first dert is for comp_P only?
 
         for p in pixel_[2:]:  # pixel p is compared to prior pixel _p in a row
             d = p - _p
@@ -117,7 +117,7 @@ def form_Pm_(P_dert_):  # initialization, accumulation, termination
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset params
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, bilateral m: for eval per pixel
-        dert_ += [dert]
+        dert_.append(dert)
         _sign = sign
 
     P_.append(CP(sign=_sign, L=L, x0=x-(L-1), I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, _smP=False))  # incomplete P
@@ -138,7 +138,7 @@ def form_Pd_(P_dert_):  # cluster by d sign, within -Pms: min neg m spans
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset accumulated params
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, m for eval per pixel is bilateral
-        dert_ += [dert]
+        dert_.append(dert)
         _sign = sign
 
     P_.append(CP(sign=_sign, x0=x-(L-1), L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, _smP=False))  # incomplete P
@@ -263,7 +263,7 @@ def range_comp(dert_, fid):  # skip odd derts for sparse rng+ comp: 1 skip / 1 a
     else:
         _m = ave - abs(_dert.d)  # no ave * rng: m and d value is cumulative
     _rng_m = (_m + _m / 2) + __dert.m  # back-project missing m as _m / 2: induction decays with distance
-    rdert_.append(Cdert(p=__i, d=None, m=_rng_m))  # no _rng_d = _d + __short_rng_d
+    rdert_.append(Cdert(p=__i, d=0, m=_rng_m))  # no _rng_d = _d + __short_rng_d
 
     for n in range(4, len(dert_), 2):  # backward comp
 
@@ -296,7 +296,7 @@ def deriv_comp(dert_):  # cross-comp consecutive uni_ds in same-sign dert_: sign
     __i = abs(__i);  _i = abs(_i)
     _d = _i - __i  # initial comp
     _m = min(__i, _i) - ave_min
-    ddert_.append(Cdert(p=_i, d=None, m=(_m + _m / 2)))  # no __d, back-project __m = _m * .5
+    ddert_.append(Cdert(p=_i, d=0, m=(_m + _m / 2)))  # no __d, back-project __m = _m * .5
 
     for dert in dert_[3:]:
         i = abs(dert.d)  # unilateral d, same sign in Pd
@@ -324,7 +324,7 @@ def cross_comp_spliced(frame_of_pixels_):  # converts frame_of_pixels to frame_o
     __p, _p = pixel__[0:2]  # each prefix '_' denotes prior
     _d = _p - __p  # initial comparison
     _m = ave - abs(_d)
-    dert_.append( Cdert(p=__p, d=None, m=(_m + _m / 2)))  # project _m to bilateral m, first dert is for comp_P only?
+    dert_.append( Cdert(p=__p, d=0, m=(_m + _m / 2)))  # project _m to bilateral m, first dert is for comp_P only?
 
     for p in pixel__[2:]:  # pixel p is compared to prior pixel _p in a row
         d = p - _p
