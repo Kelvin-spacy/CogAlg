@@ -136,7 +136,7 @@ def comp_P(P, _P, neg_M, neg_L, P_):  # multi-variate cross-comp, _smP = 0 in li
 
     for param_name in layer1:
         if param_name == "I":
-            dm = comp_param(P.dert_[0].p, _P.dert_[-1].p, 'I', ave)
+            dm = comp_param(P.dert_[0].p, _P.dert_[0].p, 'I', ave)
         else:
             param = getattr(P, param_name)
             _param = getattr(_P, param_name)
