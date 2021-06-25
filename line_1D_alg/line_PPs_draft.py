@@ -60,6 +60,8 @@ class CPP(CP, CderP):
 ave = 100  # ave dI -> mI, * coef / var type
 # no ave_mP: deviation computed via rM  # ave_mP = ave* n_comp_params: comp cost, or n vars per P: rep cost?
 ave_div = 50
+ave_inv = 20
+ave_min = 5
 ave_rM = .5  # average relative match per input magnitude, at rl=1 or .5?
 ave_M = 100  # search stop
 ave_sub_M = 50  # sub_H comp filter
@@ -116,20 +118,24 @@ def comp_P(P_, _P, P, i, j, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0
     mP = dP = 0
     layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
     _L=_P.L; L= P.L
-    dist_ave = ave_M * ave_rM ** (1 + neg_L / _P.L)
+    dist_coef = ave_rM ** (1 + neg_L / _P.L)
     # average match projected at current distance from P: neg_L, separate for min_match, add coef / var?
 
     for param_name in layer1:
         if param_name == "I":
-            if neg_L:
-                dm = comp_param(_P.dert_[-1].p, P.dert_[0].p, 'I', ave)  # add mean d of _P?
-            else:
-                dm = Cdm(d=_P.dert_[0].d, m=_P.dert_[0].m)
+            if neg_L == 0: dm = Cdm(d=_P.dert_[0].d, m=_P.dert_[0].m)
+            # else: comp mean params only?
+            ave = ave_inv * dist_coef
         else:
-            param = getattr(P, param_name)
-            _param = getattr(_P, param_name)
-            dm = comp_param(_param/L, param/L, [], dist_ave)
-        mP += dm.m; dP += dm.d
+            ave = ave_min * dist_coef
+
+        param = getattr(P, param_name)
+        _param = getattr(_P, param_name)
+        dm = comp_param(_param/L, param/L, [], ave)
+        if param_name == "I": dP += 0.5*(dm.d) or 0 ; mP += 0.5*(dm.m)
+        elif param_name == "D": dP += 0.7*(dm.d) or 0 ; mP += 0.7*(dm.m)
+        elif param_name == "L": dP += 0.7*(dm.d) or 0 ; mP += 0.7*(dm.m)
+        elif param_name == "M": dP += 0.7*(dm.d) or 0 ; mP += 0.7*(dm.m)
 
         # add comp sub_layers: deep merge
 
@@ -144,8 +150,9 @@ def comp_P(P_, _P, P, i, j, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0
 
         comp_P(P_, P_[i-1], _P, i-1, i, neg_M, neg_L)  # backward re-comp_P
         comp_P(P_, _P, P_[j+1], i, j+1, neg_M, neg_L)  # forward comp_P
-        if P.sign == _P.sign: mP *= 2  # needs revision
-        sign = mP > 0
+        if P in P_: P.sign = P.M > 0
+        else: P.sign = P.D > 0
+        derP.sign=mP >0
 
     else:  # form derP:
         for param_name in layer1:
@@ -166,7 +173,7 @@ def comp_P(P_, _P, P, i, j, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0
             if P.sub_layers and _P.sub_layers:  # not empty sub layers
                 for _sub_layer, sub_layer in zip(_P.sub_layers, P.sub_layers):
 
-                    if P and _P:  # both forks exist? or if _sub_layer and sub_layer?
+                    if _sub_layer and sub_layer:
                         _Ls, _fdP, _fid, _rdn, _rng, _sub_P_ = _sub_layer[0]
                         Ls, fdP, fid, rdn, rng, sub_P_ = sub_layer[0]
                         # fork comparison:
