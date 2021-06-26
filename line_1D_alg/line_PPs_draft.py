@@ -117,6 +117,7 @@ def search(P_):  # cross-compare patterns within horizontal line
 def comp_P(P_, _P, P, i, j, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0 in line_patterns
     mP = dP = 0
     layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
+    layer0 = {'L':.25,'I':.5,'D':.25,'M':.25}
     _L=_P.L; L= P.L
     dist_coef = ave_rM ** (1 + neg_L / _P.L)
     # average match projected at current distance from P: neg_L, separate for min_match, add coef / var?
@@ -131,12 +132,10 @@ def comp_P(P_, _P, P, i, j, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0
 
         param = getattr(P, param_name)
         _param = getattr(_P, param_name)
-        dm = comp_param(_param/L, param/L, [], ave)
-        if param_name == "I": dP += 0.5*(dm.d) or 0 ; mP += 0.5*(dm.m)
-        elif param_name == "D": dP += 0.7*(dm.d) or 0 ; mP += 0.7*(dm.m)
-        elif param_name == "L": dP += 0.7*(dm.d) or 0 ; mP += 0.7*(dm.m)
-        elif param_name == "M": dP += 0.7*(dm.d) or 0 ; mP += 0.7*(dm.m)
-
+        rdn_coef = layer0[param_name]
+        dm = comp_param(_param/L, param/L, [], rdn_coef, ave)
+        dP +=(dm.d) or 0 ; mP +=(dm.m)
+        
         # add comp sub_layers: deep merge
 
     rel_distance = neg_L / _P.L
@@ -158,7 +157,8 @@ def comp_P(P_, _P, P, i, j, neg_M, neg_L):  # multi-variate cross-comp, _smP = 0
         for param_name in layer1:
             param = getattr(P, param_name)/L
             _param = getattr(_P, param_name)/_L
-            dm = comp_param(_param, param, [], dist_ave)
+            rdn_coef = layer0[param_name]
+            dm = comp_param(_param, param, [], rdn_coef, dist_ave)
             mP += dm.m; dP += dm.d
             layer1[param_name] = dm
 
