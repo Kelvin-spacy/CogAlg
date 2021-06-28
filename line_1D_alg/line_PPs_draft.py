@@ -171,10 +171,24 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
 
 
 def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_patterns
-
+    
     mP = dP = 0
-    layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
     dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance: neg_L, diff. for min_match, add coef / var?
+    if _P.M/_P.L > ave_aM: #ave_aM = ?
+        _P.I *= 2*rdn ; _P.layer00['p_'] = [p*2*rdn for p in p_]    #rdn = ?
+        #(L,D,M, d_,m_) *= 1 should remain the same
+    else:
+        _P.L *= 2*rdn;_P.D *= 2*rdn;_P.M *= 2*rdn
+        _P.layer00['d_'] = [d*2*rdn for d in d_]
+        _P.layer00['m_'] = [m*2*rdn for m in m_]
+
+    if P.M/P.L > ave_aM: #should be computed for both _P and P?
+        P.I *= 2*rdn ; P.layer00['p_'] = [p*2*rdn for p in p_]
+        #(L,D,M, d_,m_) *= 1 should remain the same
+    else:
+        P.L *= 2*rdn;P.D *= 2*rdn;P.M *= 2*rdn
+        P.layer00['d_'] = [d*2*rdn for d in d_]
+        P.layer00['m_'] = [m*2*rdn for m in m_]
 
     for param_name in layer1:
         if param_name == "I":

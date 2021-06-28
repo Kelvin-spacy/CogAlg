@@ -319,7 +319,7 @@ class Cdm(Number):
             return "Cdm(d={}, m={})".format(self.d, self.m)
 
 
-def comp_param(param, _param, param_name, rdn_coef, ave):
+def comp_param(param, _param, param_name, ave):
 
     if isinstance(param,list): # vector
         sin, cos = param[0], param[1]
@@ -333,11 +333,11 @@ def comp_param(param, _param, param_name, rdn_coef, ave):
         # compute dm
         dm = Cdm(d=da,m=mda)   # dm of da
     else: # numeric
-        d = rdn_coef * (param - _param)  # difference
+        d = param - _param  # difference
         if param_name == 'I':
-            m = rdn_coef * (ave - abs(d))  # indirect match
+            m = ave - abs(d)  # indirect match
         else:
-            m = rdn_coef * (min(param,_param) - abs(d)/2 - ave) # direct match
+            m = min(param,_param) - abs(d)/2 - ave # direct match
         dm = Cdm(d,m) # pack d follow by m, must follow this sequence
 
     return dm
