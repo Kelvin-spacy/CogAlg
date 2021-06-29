@@ -72,6 +72,7 @@ def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patter
 
     Y, X = frame_of_pixels_.shape  # Y: frame height, X: frame width
     frame_of_patterns_ = []
+
     # put a brake point here, the code only needs one row to process
     for y in range(init_y + 1, Y):  # y is index of new line pixel_
         # initialization:
@@ -80,15 +81,15 @@ def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patter
         __p, _p = pixel_[0:2]  # each prefix '_' denotes prior
         _d = _p - __p  # initial comparison
         _m = ave - abs(_d)
-
         dert_.append( Cdert(p=__p, d=0, m=(_m + _m / 2)))  # project _m to bilateral m, first dert is for comp_P only?
 
-        for i,p in enumerate(pixel_[2:]):  # pixel p is compared to prior pixel _p in a row
+        for p in pixel_[2:]:  # pixel p is compared to prior pixel _p in a row
             d = p - _p
             m = ave - abs(d)  # initial match is inverse deviation of |difference|
             dert_.append( Cdert(p=_p, d=_d, m=m + _m))  # pack dert: prior p, prior d, bilateral match
             _p, _d, _m = p, d, m
         dert_.append( Cdert(p=_p, d=_d, m=(_m + _m / 2)))  # unilateral d, forward-project last m to bilateral m
+
         Pm_ = form_Pm_(dert_)  # forms m-sign patterns
         if len(Pm_) > 4:
             adj_M_ = form_adjacent_M_(Pm_)  # compute adjacent Ms to evaluate contrastive borrow potential
@@ -104,30 +105,22 @@ def form_Pm_(P_dert_):  # initialization, accumulation, termination
 
     P_ = []  # initialization:
     dert = P_dert_[0]
-    layer00 = dict({'p_':[],'d_':[].'m':[]})
+
     _sign = dert.m > 0
     D = dert.d or 0  # 0 if no dert.d
     L, I, M, dert_, sub_H, x = 1, dert.p, dert.m, [dert], [], 0
-    layer00['p_'].append(dert.p)
-    layer00['d_'].append(dert.d or 0)
-    layer00['m_'].append(dert.m)
-
     # cluster P_derts by m sign
     for dert in P_dert_[1:]:
         sign = dert.m > 0
         if sign != _sign:  # sign change, terminate P
-            P_.append(CP(sign=_sign, x0=x-(L-1), L=L, I=I, D=D, M=M, dert_=dert_, layer00 = layer00,sub_layers=sub_H, _smP=False))
+            P_.append(CP(sign=_sign, x0=x-(L-1), L=L, I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, _smP=False))
             L, I, D, M, dert_, sub_H = 0, 0, 0, 0, [], []  # reset params
-            layer00 = dict({'p_':[],'d_':[].'m':[]})
 
         L += 1; I += dert.p; D += dert.d; M += dert.m  # accumulate params, bilateral m: for eval per pixel
-        layer00['p_'].append(dert.p)
-        layer00['d_'].append(dert.d)
-        layer00['m_'].append(dert.m)
         dert_.append(dert)
         _sign = sign
 
-    P_.append(CP(sign=_sign, L=L, x0=x-(L-1), I=I, D=D, M=M, dert_=dert_, layer00 = layer00, sub_layers=sub_H, _smP=False))  # incomplete P
+    P_.append(CP(sign=_sign, L=L, x0=x-(L-1), I=I, D=D, M=M, dert_=dert_, sub_layers=sub_H, _smP=False))  # incomplete P
     return P_
 
 
