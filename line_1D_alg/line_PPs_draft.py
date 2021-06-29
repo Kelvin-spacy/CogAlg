@@ -139,7 +139,7 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
 
     mP = dP = 0
     layer1 = dict({'L': .0, 'I': .0, 'D': .0, 'M': .0})
-    
+    layer0 = {'L':.25,'I':.5,'D':.25,'M':.25}
     dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance from P: neg_L, separate for min_match, add coef / var?
 
     for param_name in layer1:
@@ -148,8 +148,9 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
         else: dist_ave = ave_min * dist_coef
         param = getattr(_P, param_name) / _P.L  # swap _ convention here, it's different in search
         _param = getattr(P, param_name) / P.L
+        rdn_coef = layer0[param_name]
         dm = comp_param(_param, param, [], dist_ave)
-        mP += dm.m; dP += dm.d
+        mP += rdn_coef*(dm.m); dP += rdn_coef*(dm.d)
         layer1[param_name] = dm
     if neg_L == 0:
         mP += _P.dert_[0].m; dP += _P.dert_[0].d
@@ -181,7 +182,26 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
 
     mP = dP = 0
     layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
+    layer0 = {'L':.25,'I':.5,'D':.25,'M':.25}
     dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance:
+    '''
+    Draft - Needs further changes
+    if _P.M/_P.L > ave_aM: #ave_aM = ?
+        _P.I *= 2*rdn ; _P.layer00['p_'] = [p*2*rdn for p in p_]    #rdn = ?
+        #(L,D,M, d_,m_) *= 1 should remain the same
+    else:
+        _P.L *= 2*rdn;_P.D *= 2*rdn;_P.M *= 2*rdn
+        _P.layer00['d_'] = [d*2*rdn for d in d_]
+        _P.layer00['m_'] = [m*2*rdn for m in m_]
+
+    if P.M/P.L > ave_aM: #should be computed for both _P and P?
+        P.I *= 2*rdn ; P.layer00['p_'] = [p*2*rdn for p in p_]
+        #(L,D,M, d_,m_) *= 1 should remain the same
+    else:
+        P.L *= 2*rdn;P.D *= 2*rdn;P.M *= 2*rdn
+        P.layer00['d_'] = [d*2*rdn for d in d_]
+        P.layer00['m_'] = [m*2*rdn for m in m_]
+    '''
 
     for param_name in layer1:
         if param_name == "I":
@@ -190,8 +210,9 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
             dist_ave = ave_min * dist_coef
         param = getattr(_P, param_name)
         _param = getattr(P, param_name)
+        rdn_coef = layer0[param_name]
         dm = comp_param(_param, param, [], dist_ave)
-        mP += dm.m; dP += dm.d
+        mP += rdn_coef*(dm.m); dP += rdn_coef*(dm.d)
         layer1[param_name] = dm
         '''
         main comp is between summed params, with an option for div_comp, etc.
