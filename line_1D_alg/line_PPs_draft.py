@@ -68,7 +68,7 @@ ave_PPM = 200
 ave_merge = -50  # merge adjacent Ps
 ave_inv = 20 # ave inverse m, change to Ave from the root intra_blob?
 ave_min = 5  # ave direct m, change to Ave_min from the root intra_blob?
-
+layer0 = {'L':.25,'I':.5,'D':.25,'M':.25}
 
 def search(P_):  # cross-compare patterns within horizontal line
 
@@ -131,6 +131,7 @@ def search(P_):  # cross-compare patterns within horizontal line
     if len(derP_d_)>1:
         derP_d_ = form_adjacent_mP(derP_d_)
         PPd_ = form_PPd_(derP_d_)  # cluster derP_ds into PPds by the sign of vdP
+    PL,PI,PD,PM = form_PP_param(derP_)  #Conditional?
 
     return PPm_, PPd_
 
@@ -139,7 +140,6 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
 
     mP = dP = 0
     layer1 = dict({'L': .0, 'I': .0, 'D': .0, 'M': .0})
-    layer0 = {'L':.25,'I':.5,'D':.25,'M':.25}
     dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance from P: neg_L, separate for min_match, add coef / var?
 
     for param_name in layer1:
@@ -148,9 +148,9 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
         else: dist_ave = ave_min * dist_coef
         param = getattr(_P, param_name) / _P.L  # swap _ convention here, it's different in search
         _param = getattr(P, param_name) / P.L
-        rdn_coef = layer0[param_name]
+        rdn = layer0_rdn[param_name]
         dm = comp_param(_param, param, [], dist_ave)
-        mP += rdn_coef*(dm.m); dP += rdn_coef*(dm.d)
+        mP += dm.m*rdn; dP += dm.d*rdn
         layer1[param_name] = dm
     if neg_L == 0:
         mP += _P.dert_[0].m; dP += _P.dert_[0].d
@@ -182,7 +182,6 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
 
     mP = dP = 0
     layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
-    layer0 = {'L':.25,'I':.5,'D':.25,'M':.25}
     dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance:
     '''
     Draft - Needs further changes
@@ -210,9 +209,9 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
             dist_ave = ave_min * dist_coef
         param = getattr(_P, param_name)
         _param = getattr(P, param_name)
-        rdn_coef = layer0[param_name]
+        rdn = layer0_rdn[param_name]
         dm = comp_param(_param, param, [], dist_ave)
-        mP += rdn_coef*(dm.m); dP += rdn_coef*(dm.d)
+        mP += dm.m*rdn; dP += dm.d*rdn
         layer1[param_name] = dm
         '''
         main comp is between summed params, with an option for div_comp, etc.
@@ -234,6 +233,59 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
             _P.derP = derP
 
     return derP, _P.L, _P.sign
+
+def form_P_param(derP_):
+    PL_ = []
+    PM_ = []
+    PD_ = []
+    PI_ = []
+
+    derP = derP_[0]
+    for param_name in derP.layer1:
+        rdn = layer0_rdn[param_name]
+        m = derP.layer1[param_name].m*rdn; d = derP.layer1[param_name].d*rdn
+        if param_name == 'L': PL_.append(CPP(dm=[d,m])); mL=m;dL=d
+        elif param_name == 'I': PI_.append(CPP(dm=[d,m])); mI=m;dI=d
+        elif param_name == 'D': PD_.append(CPP(dm=[d,m])); mD=m;dD=d
+        elif param_name == 'M': PM_.append(CPP(dm=[d,m])); mM=m;dM=d
+
+    
+    for derP in derP_:
+        if derP.mP >0:  #Not sure about this
+            PL_.append(CPP(dm=[dL,mL]))
+            PI_.append(CPP(dm=[dI,mI]))
+            PD_.append(CPP(dm=[dD,mD]))
+            PM_.append(CPP(dm=[dM,mM]))
+            mL=dL=mI=dI=dD=mD=dM=mM=0
+
+        else:
+            for param_name in derP.layer1:
+                rdn = layer0[param_name]
+                # Each param accum may require extra condition?
+                if param_name == 'L': mL+=derP.layer1[param_name].m*rdn; dL+=derP.layer1[param_name].d*rdn
+                elif param_name == 'I': mI+=derP.layer1[param_name].m*rdn; dI+=derP.layer1[param_name].d*rdn
+                elif param_name == 'D': mD+=derP.layer1[param_name].m*rdn; dD+=derP.layer1[param_name].d*rdn
+                elif param_name == 'M': mM+=derP.layer1[param_name].m*rdn; dM+=derP.layer1[param_name].d*rdn
+    PL_.append(CPP(dm=[dL,mL]))
+    PI_.append(CPP(dm=[dI,mI]))
+    PD_.append(CPP(dm=[dD,mD]))
+    PM_.append(CPP(dm=[dM,mM]))
+
+    return PL,PI,PD,PM
+
+
+                    
+
+
+
+
+
+
+
+
+                
+
+
 
 
 def comp_sublayers(_P, P, mP):  # also add dP?
