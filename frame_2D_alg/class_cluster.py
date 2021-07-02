@@ -262,7 +262,7 @@ class ClusterStructure(metaclass=MetaCluster):
     def __init__(self, **kwargs):
         pass
 
-    def accum_from(self, other, excluded=()):
+    def accum_from(self, other, excluded=(), layer0=None):
         """Accumulate params from another structure."""
 
         # accumulate base params
@@ -270,7 +270,11 @@ class ClusterStructure(metaclass=MetaCluster):
             if (param not in excluded) and (param in other.numeric_params):
                 p = getattr(self,param)
                 _p = getattr(other,param)
-                setattr(self, param, p+_p)
+                if param in layer0 and layer0 not None:
+                    rdn = layer0[param]
+                    setattr(self, param, rdn*(p+_p))
+                else:
+                    setattr(self, param, p+_p)
 
         # accumulate layers 1 and above
         for layer_num in self.dict_params:

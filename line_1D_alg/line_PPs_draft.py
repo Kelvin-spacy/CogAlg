@@ -56,7 +56,8 @@ class CPP(CP, CderP):
     derP_ = list  # constituents, maybe sub_PPm_
 
 class CPp(ClusterStructure):
-    dm = list
+    mPp = int
+    dPp = int
 
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -134,7 +135,7 @@ def search(P_):  # cross-compare patterns within horizontal line
     if len(derP_d_)>1:
         derP_d_ = form_adjacent_mP(derP_d_)
         PPd_ = form_PPd_(derP_d_)  # cluster derP_ds into PPds by the sign of vdP
-    PL_,PI_,PD_,PM_ = form_Ppar_(PPm_)  #Conditional?
+    PL_,PI_,PD_,PM_ = form_Pp_(PPm_)  #Conditional?
 
     return PPm_, PPd_
 
@@ -237,44 +238,50 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
 
     return derP, _P.L, _P.sign
 
-def form_Ppar_(PPm_):
+def form_Pp_(PPm_):
     PL_ = []
     PM_ = []
     PD_ = []
     PI_ = []
 
     derP = PPm_[0].derP
-    for param_name in derP.layer1:
-        rdn = layer0_rdn[param_name]
-        m = derP.layer1[param_name].m*rdn; d = derP.layer1[param_name].d*rdn
-        if param_name == 'L': PL_.append(CPp(dm=[d,m])); mL=m;dL=d
-        elif param_name == 'I': PI_.append(CPp(dm=[d,m])); mI=m;dI=d
-        elif param_name == 'D': PD_.append(CPp(dm=[d,m])); mD=m;dD=d
-        elif param_name == 'M': PM_.append(CPp(dm=[d,m])); mM=m;dM=d
-
+    if derP.layer1: #layer1 may be empty
+        for param_name in derP.layer1:
+            rdn = layer0_rdn[param_name]
+            m = derP.layer1[param_name].m*rdn; d = derP.layer1[param_name].d*rdn
+            if param_name == 'L': PL_.append(CPp(mPp=m,dPp=d)); mL=m;dL=d
+            elif param_name == 'I': PI_.append(CPp(mPp=m,dPp=d)); mI=m;dI=d
+            elif param_name == 'D': PD_.append(CPp(mPp=m,dPp=d)); mD=m;dD=d
+            elif param_name == 'M': PM_.append(CPp(mPp=m,dPp=d)); mM=m;dM=d
+    else:
+        mL=dL=mI=dI=dD=mD=dM=mM=0
     
     for i,PP in enumerate(PPm_,start=1):
         if PP.mP >0:  #Not sure about this
             #terminate Pp
-            PL_.append(CPp(dm=[dL,mL]))
-            PI_.append(CPp(dm=[dI,mI]))
-            PD_.append(CPp(dm=[dD,mD]))
-            PM_.append(CPp(dm=[dM,mM]))
+            PL_.append(CPp(mPp=mL,dPp=dL))
+            PI_.append(CPp(mPp=mI,dPp=dI))
+            PD_.append(CPp(mPp=mD,dPp=dD))
+            PM_.append(CPp(mPp=mM,dPp=dM))
             mL=dL=mI=dI=dD=mD=dM=mM=0
 
         else:
             derP=PP.derP
-            for param_name in derP.layer1:
-                rdn = layer0[param_name]
-                # Each param accum may require extra conditions?
-                if param_name == 'L': mL+=derP.layer1[param_name].m*rdn; dL+=derP.layer1[param_name].d*rdn
-                elif param_name == 'I': mI+=derP.layer1[param_name].m*rdn; dI+=derP.layer1[param_name].d*rdn
-                elif param_name == 'D': mD+=derP.layer1[param_name].m*rdn; dD+=derP.layer1[param_name].d*rdn
-                elif param_name == 'M': mM+=derP.layer1[param_name].m*rdn; dM+=derP.layer1[param_name].d*rdn
-    PL_.append(CPp(dm=[dL,mL]))
-    PI_.append(CPp(dm=[dI,mI]))
-    PD_.append(CPp(dm=[dD,mD]))
-    PM_.append(CPp(dm=[dM,mM]))
+            if derP.layer1:
+                for param_name in derP.layer1:
+                    rdn = layer0[param_name]
+                    # Each param accum may require extra conditions?
+                    if param_name == 'L': mL+=derP.layer1[param_name].m*rdn; dL+=derP.layer1[param_name].d*rdn
+                    elif param_name == 'I': mI+=derP.layer1[param_name].m*rdn; dI+=derP.layer1[param_name].d*rdn
+                    elif param_name == 'D': mD+=derP.layer1[param_name].m*rdn; dD+=derP.layer1[param_name].d*rdn
+                    elif param_name == 'M': mM+=derP.layer1[param_name].m*rdn; dM+=derP.layer1[param_name].d*rdn
+            else:
+                mL=dL=mI=dI=dD=mD=dM=mM=0
+
+    PL_.append(CPp(mPp=mL,dPp=dL))
+    PI_.append(CPp(mPp=mI,dPp=dI))
+    PD_.append(CPp(mPp=mD,dPp=dD))
+    PM_.append(CPp(mPp=mM,dPp=dM))
 
     return PL_,PI_,PD_,PM_
 
@@ -336,7 +343,7 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
             PP.derP = derP
             derP.PP = PP  # PP that derP belongs to, for merging PPs in back_search_extend
         else:
-            PP.accum_from(derP.P)   # rdn here?
+            PP.accum_from(derP.P,layer0=layer0_rdn)   # rdn here?
             PP.accum_from(derP)  # accumulate PPm numerical params with same-name current derP params, exclusions?
 
     PPm_.append(PP)  # pack last PP
@@ -378,7 +385,7 @@ def form_PPd_(derP_d_):
             PP.derP = derP_d
             derP_d.PP = PP
         else:
-            PP.accum_from(derP_d.P)
+            PP.accum_from(derP_d.P,layer0=layer0_rdn)
             PP.accum_from(derP_d)
 
     PPd_.append(PP)
