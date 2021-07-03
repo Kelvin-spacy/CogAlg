@@ -56,8 +56,8 @@ class CPP(CP, CderP):
     derP_ = list  # constituents, maybe sub_PPm_
 
 class CPp(ClusterStructure):
-    mPp = int
-    dPp = int
+    Ppm = int
+    Ppd = int
 
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -249,20 +249,20 @@ def form_Pp_(PPm_):
         for param_name in derP.layer1:
             rdn = layer0_rdn[param_name]
             m = derP.layer1[param_name].m*rdn; d = derP.layer1[param_name].d*rdn
-            if param_name == 'L': PL_.append(CPp(mPp=m,dPp=d)); mL=m;dL=d
-            elif param_name == 'I': PI_.append(CPp(mPp=m,dPp=d)); mI=m;dI=d
-            elif param_name == 'D': PD_.append(CPp(mPp=m,dPp=d)); mD=m;dD=d
-            elif param_name == 'M': PM_.append(CPp(mPp=m,dPp=d)); mM=m;dM=d
+            if param_name == 'L': PL_.append(CPp(Ppm=m,Ppd=d)); mL=m;dL=d
+            elif param_name == 'I': PI_.append(CPp(Ppm=m,Ppd=d)); mI=m;dI=d
+            elif param_name == 'D': PD_.append(CPp(Ppm=m,Ppd=d)); mD=m;dD=d
+            elif param_name == 'M': PM_.append(CPp(Ppm=m,Ppd=d)); mM=m;dM=d
     else:
         mL=dL=mI=dI=dD=mD=dM=mM=0
     
     for i,PP in enumerate(PPm_,start=1):
         if PP.mP >0:  #Not sure about this
             #terminate Pp
-            PL_.append(CPp(mPp=mL,dPp=dL))
-            PI_.append(CPp(mPp=mI,dPp=dI))
-            PD_.append(CPp(mPp=mD,dPp=dD))
-            PM_.append(CPp(mPp=mM,dPp=dM))
+            PL_.append(CPp(Ppm=mL,Ppd=dL))
+            PI_.append(CPp(Ppm=mI,Ppd=dI))
+            PD_.append(CPp(Ppm=mD,Ppd=dD))
+            PM_.append(CPp(Ppm=mM,Ppd=dM))
             mL=dL=mI=dI=dD=mD=dM=mM=0
 
         else:
@@ -278,10 +278,10 @@ def form_Pp_(PPm_):
             else:
                 mL=dL=mI=dI=dD=mD=dM=mM=0
 
-    PL_.append(CPp(mPp=mL,dPp=dL))
-    PI_.append(CPp(mPp=mI,dPp=dI))
-    PD_.append(CPp(mPp=mD,dPp=dD))
-    PM_.append(CPp(mPp=mM,dPp=dM))
+    PL_.append(CPp(Ppm=mL,Ppd=dL))
+    PI_.append(CPp(Ppm=mI,Ppd=dI))
+    PD_.append(CPp(Ppm=mD,Ppd=dD))
+    PM_.append(CPp(Ppm=mM,Ppd=dM))
 
     return PL_,PI_,PD_,PM_
 
