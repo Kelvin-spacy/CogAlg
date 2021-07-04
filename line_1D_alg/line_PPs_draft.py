@@ -56,9 +56,9 @@ class CPP(CP, CderP):
     sign = bool
     derP_ = list  # constituents, maybe sub_PPm_
 
-class CPp(ClusterStructure):
-    Ppm = object
-    Ppd = object
+class CPp(CP):
+    pass
+    
 
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -240,60 +240,46 @@ def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_p
     return derP, _P.L, _P.sign
 
 def form_Pp_(PPm_):
-    PL_ = []
-    PM_ = []
-    PD_ = []
-    PI_ = []
-    #Not sure if these lists are needed when we have PP.layer0
-    Ppm_ = []
-    Ppd_ = []
-    #initialize Ppm and Ppd
-    derP = PPm_[0].derP
-    Ppm = CP(L=0,M=0,derP = derP, _smP=False, sign=False)
-    Ppd = CP(L=0,D=0,derP = derP, _smP=False, sign=False)
+
     
     for PP in PPm_: #interae ove PPm_ in search of strong Ps
-        PP.layer0 = dict({'L':[],'I':[],'D':[],'M':[]}) #initialize layer0
-        derP = PP.derP_[0]  # PP.derP_[0] is rdn to PP.derP?
-        for param_name in PP.layer0:
-            rdn = layer0_rdn[param_name]
-            if derP.layer1[param_name].m > ave_M:   #check if param m is stronger
-                #terminate Ppm
-                Ppm.sign = derP.layer1[param_name].m > 0
-                Ppm_.append(CPp(Ppm = Ppm, Ppd=0))      #both should be defined for condional use 
-                PP.layer0[param_name].append(Ppm_)      #Append into PP from where derP is derived. mutable?
-                #Segregate and populate Pparam lists
-                if param_name == 'L': PL_.append(CPp(Ppm = Ppm, Ppd=0))
-                elif param_name == 'I': PI_.append(CPp(Ppm = Ppm, Ppd=0))
-                elif param_name == 'D': PD_.append(CPp(Ppm = Ppm, Ppd=0))
-                elif param_name == 'M': PM_.append(CPp(Ppm = Ppm, Ppd=0))
-                #Reinitialization 
-                Ppm = CP(L=0,M=0,derP = derP, _smP=False, sign=False)
-                Ppm_ = []
-            else:
-                #Accumulate Ppm values with rdn applied
-                Ppm.L+=1;Ppm.M+=derP.layer1[param_name].m*rdn
-
-            if derP.layer1[param_name].d > ave_D:   #check if param.d is stronger
-                Ppd.sign = derP.layer1[param_name].d > 0    #param.d sign - bool    
-                Ppd_.append(CPp(Ppm = 0, Ppd = Ppd))    #Ppm = 0 OR empty CP object?
-                PP.layer0[param_name].append(Ppd_)  #Append into PP from where derP is derived
-
-                #Segregate and populate Pparam lists
-                if param_name == 'L': PL_.append(CPp(Ppm = 0, Ppd= Ppd))
-                elif param_name == 'I': PI_.append(CPp(Ppm = 0, Ppd= Ppd))
-                elif param_name == 'D': PD_.append(CPp(Ppm = 0, Ppd= Ppd))
-                elif param_name == 'M': PM_.append(CPp(Ppm = 0, Ppd= Ppd))
-                #Reinitialization
-                Ppd = CP(L=0,D=0,derP = derP, _smP=False, sign=False)
-                Ppd_ = []
-            else:
-                #Accumulations
-                Ppd.L+=1;Ppd.D+=derP.layer1[param_name].d*rdn
+        if PP.layer1:   # if layer1 is not empty
+            for param_name in PP.layer0:
+                if PP.layer1[param_name].m > ave_M:
+                    form_Ppm_(PP,param_name)
+                if PP.layer1[param_name].d > ave_D:
+                    form_Ppd_(PP,param_name) 
 
 
-    return PL_,PI_,PD_,PM_
 
+
+def form_Ppm_(PP,param_name):
+    rdn = layer0_rdn[param_name]
+    _m = PP.derP_[0].layer1[param_name].m > 0
+    Ppm = CPp(L=0, M=_m, derP_ = [PP.derP_[0]], _smP=False, sign=_m > 0)
+    for derP in PP.derP:
+        m = derP.layer1[param_name].m > 0
+        if m == _m:
+            PP.layer1[param_name].Ppm.append(Ppm)
+        else:
+            Ppm.L+=1;Ppm.M+=m*rdn
+            Ppm.sign = m > 0
+            Ppm.derP.append(derP)
+        _m = m
+
+def form_Ppd_(PP,param_name):
+    rdn = layer0_rdn[param_name]
+    _d = PP.derP_[0].layer1[param_name].d > 0
+    Ppd = CPp(L=0, D=_d, derP_ = [PP.derP_[0]], _smP=False, sign=_d > 0)
+    for derP in PP.derP:
+        d = derP.layer1[param_name].d > 0
+        if d == _d:
+            PP.layer1[param_name].Ppd.append(Ppd)
+        else:
+            Ppd.L+=1;Ppd.D+=d*rdn
+            Ppd.sign = d > 0
+            Ppd.derP.append(derP)
+        _d = d
 
 
 def comp_sublayers(_P, P, mP):  # also add dP?

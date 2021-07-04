@@ -307,10 +307,10 @@ class ClusterStructure(metaclass=MetaCluster):
 
 
 class Cdm(Number):
-    __slots__ = ('d', 'm')
+    __slots__ = ('d', 'Ppd_' ,'m', 'Ppm_')
 
-    def __init__(self, d=0, m=0):
-        self.d, self.m = d, m
+    def __init__(self, d=0,Ppd_=[], m=0, Ppm_=[]):
+        self.d, self.Ppd_, self.m, self.Ppm_ = d, Ppd_, m, Ppm_
 
     def __add__(self, other):
         return Cdm(self.d + other.d, self.m + other.m)
@@ -320,7 +320,7 @@ class Cdm(Number):
         if isinstance(self.d, Cdm) or isinstance(self.m, Cdm):
             return "Cdm(d=Cdm, m=Cdm)"
         else:
-            return "Cdm(d={}, m={})".format(self.d, self.m)
+            return "Cdm(d={}, Ppd_=[], m={}, Ppm_=[])".format(self.d, self.Ppd_, self.m, self.Ppm_)
 
 
 def comp_param(param, _param, param_name, ave):
@@ -342,7 +342,7 @@ def comp_param(param, _param, param_name, ave):
             m = ave - abs(d)  # indirect match
         else:
             m = min(param,_param) - abs(d)/2 - ave # direct match
-        dm = Cdm(d,m) # pack d follow by m, must follow this sequence
+        dm = Cdm(d,[],m,[]) # pack d follow by m, must follow this sequence
 
     return dm
 
