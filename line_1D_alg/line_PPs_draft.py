@@ -44,6 +44,7 @@ class CderP(ClusterStructure):
     neg_M = int
     neg_L = int
     adj_mP = int
+    layer0 = dict
     P = object
     layer1 = dict  # d, m per comparand
     der_sub_H = list  # sub hierarchy of derivatives, from comp sublayers
@@ -56,8 +57,8 @@ class CPP(CP, CderP):
     derP_ = list  # constituents, maybe sub_PPm_
 
 class CPp(ClusterStructure):
-    Ppm = int
-    Ppd = int
+    Ppm = object
+    Ppd = object
 
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -243,45 +244,53 @@ def form_Pp_(PPm_):
     PM_ = []
     PD_ = []
     PI_ = []
-
+    #Not sure if these lists are needed when we have PP.layer0
+    Ppm_ = []
+    Ppd_ = []
+    #initialize Ppm and Ppd
     derP = PPm_[0].derP
-    if derP.layer1: #layer1 may be empty
-        for param_name in derP.layer1:
-            rdn = layer0_rdn[param_name]
-            m = derP.layer1[param_name].m*rdn; d = derP.layer1[param_name].d*rdn
-            if param_name == 'L': PL_.append(CPp(Ppm=m,Ppd=d)); mL=m;dL=d
-            elif param_name == 'I': PI_.append(CPp(Ppm=m,Ppd=d)); mI=m;dI=d
-            elif param_name == 'D': PD_.append(CPp(Ppm=m,Ppd=d)); mD=m;dD=d
-            elif param_name == 'M': PM_.append(CPp(Ppm=m,Ppd=d)); mM=m;dM=d
-    else:
-        mL=dL=mI=dI=dD=mD=dM=mM=0
+    Ppm = CP(L=0,M=0,derP = derP, _smP=False, sign=False)
+    Ppd = CP(L=0,D=0,derP = derP, _smP=False, sign=False)
     
-    for i,PP in enumerate(PPm_,start=1):
-        if PP.mP >0:  #Not sure about this
-            #terminate Pp
-            PL_.append(CPp(Ppm=mL,Ppd=dL))
-            PI_.append(CPp(Ppm=mI,Ppd=dI))
-            PD_.append(CPp(Ppm=mD,Ppd=dD))
-            PM_.append(CPp(Ppm=mM,Ppd=dM))
-            mL=dL=mI=dI=dD=mD=dM=mM=0
-
-        else:
-            derP=PP.derP
-            if derP.layer1:
-                for param_name in derP.layer1:
-                    rdn = layer0[param_name]
-                    # Each param accum may require extra conditions?
-                    if param_name == 'L': mL+=derP.layer1[param_name].m*rdn; dL+=derP.layer1[param_name].d*rdn
-                    elif param_name == 'I': mI+=derP.layer1[param_name].m*rdn; dI+=derP.layer1[param_name].d*rdn
-                    elif param_name == 'D': mD+=derP.layer1[param_name].m*rdn; dD+=derP.layer1[param_name].d*rdn
-                    elif param_name == 'M': mM+=derP.layer1[param_name].m*rdn; dM+=derP.layer1[param_name].d*rdn
+    for PP in PPm_: #interae ove PPm_ in search of strong Ps
+        PP.layer0 = dict({'L':[],'I':[],'D':[],'M':[]}) #initialize layer0
+        derP = PP.derP_[0]  # PP.derP_[0] is rdn to PP.derP?
+        for param_name in PP.layer0:
+            rdn = layer0_rdn[param_name]
+            if derP.layer1[param_name].m > ave_M:   #check if param m is stronger
+                #terminate Ppm
+                Ppm.sign = derP.layer1[param_name].m > 0
+                Ppm_.append(CPp(Ppm = Ppm, Ppd=0))      #both should be defined for condional use 
+                PP.layer0[param_name].append(Ppm_)      #Append into PP from where derP is derived. mutable?
+                #Segregate and populate Pparam lists
+                if param_name == 'L': PL_.append(CPp(Ppm = Ppm, Ppd=0))
+                elif param_name == 'I': PI_.append(CPp(Ppm = Ppm, Ppd=0))
+                elif param_name == 'D': PD_.append(CPp(Ppm = Ppm, Ppd=0))
+                elif param_name == 'M': PM_.append(CPp(Ppm = Ppm, Ppd=0))
+                #Reinitialization 
+                Ppm = CP(L=0,M=0,derP = derP, _smP=False, sign=False)
+                Ppm_ = []
             else:
-                mL=dL=mI=dI=dD=mD=dM=mM=0
+                #Accumulate Ppm values with rdn applied
+                Ppm.L+=1;Ppm.M+=derP.layer1[param_name].m*rdn
 
-    PL_.append(CPp(Ppm=mL,Ppd=dL))
-    PI_.append(CPp(Ppm=mI,Ppd=dI))
-    PD_.append(CPp(Ppm=mD,Ppd=dD))
-    PM_.append(CPp(Ppm=mM,Ppd=dM))
+            if derP.layer1[param_name].d > ave_D:   #check if param.d is stronger
+                Ppd.sign = derP.layer1[param_name].d > 0    #param.d sign - bool    
+                Ppd_.append(CPp(Ppm = 0, Ppd = Ppd))    #Ppm = 0 OR empty CP object?
+                PP.layer0[param_name].append(Ppd_)  #Append into PP from where derP is derived
+
+                #Segregate and populate Pparam lists
+                if param_name == 'L': PL_.append(CPp(Ppm = 0, Ppd= Ppd))
+                elif param_name == 'I': PI_.append(CPp(Ppm = 0, Ppd= Ppd))
+                elif param_name == 'D': PD_.append(CPp(Ppm = 0, Ppd= Ppd))
+                elif param_name == 'M': PM_.append(CPp(Ppm = 0, Ppd= Ppd))
+                #Reinitialization
+                Ppd = CP(L=0,D=0,derP = derP, _smP=False, sign=False)
+                Ppd_ = []
+            else:
+                #Accumulations
+                Ppd.L+=1;Ppd.D+=derP.layer1[param_name].d*rdn
+
 
     return PL_,PI_,PD_,PM_
 
