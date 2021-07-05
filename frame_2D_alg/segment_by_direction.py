@@ -138,9 +138,6 @@ def merge_blobs(blob, adj_blob, strong_adj_blobs):  # merge blob and adj_blob by
         extended_mask__[cby0:cbyn, cbx0:cbxn] = np.logical_and(adj_blob.mask__, extended_mask__[cby0:cbyn, cbx0:cbxn])
         # create extended derts from combined box
         extended_dert__ = [np.zeros((cyn-cy0,cxn-cx0)) for _ in range(len(blob.dert__))]
-        extended_dert__[5] = np.zeros((cyn-cy0,cxn-cx0),dtype=np.complex_) # complex day
-        extended_dert__[6] = np.zeros((cyn-cy0,cxn-cx0),dtype=np.complex_) # complex dax
-
         for i in range(len(blob.dert__)):
             extended_dert__[i][cay0:cayn, cax0:caxn] = blob.dert__[i]
             extended_dert__[i][cby0:cbyn, cbx0:cbxn] = adj_blob.dert__[i]
@@ -207,7 +204,7 @@ def visualize_merging_process(iblob, dir_blob_, _dir_blob_, mask__, i):
     # after merging
     img_weak_merged = ((~img_mask_weak_merged)*90).astype('uint8')          # weak blobs after merging process
     img_strong_merged = ((~img_mask_strong_merged)*255).astype('uint8')     # strong blobs after merging process
-    img_combined_merged = img_weak_merged + img_strong_merged                      # merge weak and strong blobs
+    img_combined_merged = img_weak_merged + img_strong_merged               # merge weak and strong blobs
     # img_overlap_merged = np.logical_and(~img_mask_weak_merged, ~img_mask_strong_merged)*255 # overlapping area (between blobs) to check if we merge blob twice
 
     img_concat = np.concatenate((img_weak, img_separator,

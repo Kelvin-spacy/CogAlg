@@ -53,11 +53,15 @@ Kok Wei Chee, $14200, team developer
 
 2021:
 
-Kok Wei Chee, $6500, team developer, January-April
+Kok Wei Chee, $9700, team developer, January-June
 
-Khanh Nguyen, $300, team developer, April
+Khanh Nguyen, $2100, team developer, April-June
 
-Aqib Mumtaz and Ayesha Ali, $1100: audio interfacing for 1D alg, April
+Aqib Mumtaz and Ayesha Ali, $1400: audio interfacing for 1D alg, April-May
+
+Kelvin Spacey, $870: various, May-June
+
+Yura Guruel, $600: various, May-June
 
 
 

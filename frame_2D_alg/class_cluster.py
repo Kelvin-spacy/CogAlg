@@ -262,7 +262,7 @@ class ClusterStructure(metaclass=MetaCluster):
     def __init__(self, **kwargs):
         pass
 
-    def accum_from(self, other, excluded=(), layer0=None):
+    def accum_from(self, other, excluded=()):
         """Accumulate params from another structure."""
 
         # accumulate base params
@@ -270,11 +270,8 @@ class ClusterStructure(metaclass=MetaCluster):
             if (param not in excluded) and (param in other.numeric_params):
                 p = getattr(self,param)
                 _p = getattr(other,param)
-                if param in layer0 and layer0 not None:
-                    rdn = layer0[param]
-                    setattr(self, param, rdn*(p+_p))
-                else:
-                    setattr(self, param, p+_p)
+
+                setattr(self, param, p+_p)
 
         # accumulate layers 1 and above
         for layer_num in self.dict_params:
@@ -307,10 +304,11 @@ class ClusterStructure(metaclass=MetaCluster):
 
 
 class Cdm(Number):
-    __slots__ = ('d', 'Ppd_' ,'m', 'Ppm_')
 
-    def __init__(self, d=0,Ppd_=[], m=0, Ppm_=[]):
-        self.d, self.Ppd_, self.m, self.Ppm_ = d, Ppd_, m, Ppm_
+    __slots__ = ('d', 'm')
+
+    def __init__(self, d=0, m=0):
+        self.d, self.m = d, m
 
     def __add__(self, other):
         return Cdm(self.d + other.d, self.m + other.m)
@@ -320,7 +318,24 @@ class Cdm(Number):
         if isinstance(self.d, Cdm) or isinstance(self.m, Cdm):
             return "Cdm(d=Cdm, m=Cdm)"
         else:
-            return "Cdm(d={}, Ppd_=[], m={}, Ppm_=[])".format(self.d, self.Ppd_, self.m, self.Ppm_)
+
+            return "Cdm(d={}, m={})".format(self.d, self.m)
+
+# Kelvin:
+class Cdm_(Number):
+    __slots__ = ('d', 'Ppd_' ,'m', 'Ppm_')
+
+    def __init__(self, d=0,Ppd_=[], m=0, Ppm_=[]):
+        self.d, self.Ppd_, self.m, self.Ppm_ = d, Ppd_, m, Ppm_
+
+    def __add__(self, other):
+        return Cdm_(self.d + other.d, self.m + other.m)
+
+    def __repr__(self):  # representation of object
+        if isinstance(self.d, Cdm_) or isinstance(self.m, Cdm_):
+            return "Cdm_(d=Cdm_, m=Cdm_)"
+        else:
+            return "Cdm_(d={}, Ppd_=[], m={}, Ppm_=[])".format(self.d, self.Ppd_, self.m, self.Ppm_)
 
 
 def comp_param(param, _param, param_name, ave):
@@ -337,12 +352,15 @@ def comp_param(param, _param, param_name, ave):
         # compute dm
         dm = Cdm(d=da,m=mda)   # dm of da
     else: # numeric
-        d = param - _param  # difference
+
+        d = param - _param    # difference
         if param_name == 'I':
             m = ave - abs(d)  # indirect match
         else:
-            m = min(param,_param) - abs(d)/2 - ave # direct match
-        dm = Cdm(d,[],m,[]) # pack d follow by m, must follow this sequence
+            m = min(param,_param) - abs(d)/2 - ave  # direct match
+        dm = Cdm(d,m) # pack d follow by m, must follow this sequence
+
+        # dm = Cdm_(d, [], m, []) if Pp
 
     return dm
 

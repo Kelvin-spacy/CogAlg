@@ -21,7 +21,11 @@
     thus should be cross-compared between blobs on the next level of search.
     - assign_adjacents:
     Each blob is assigned internal and external sets of opposite-sign blobs it is connected to.
-    Please see illustrations: https://github.com/boris-kz/CogAlg/blob/master/frame_2D_alg/Illustrations/frame_blobs.png
+    Frame_blobs is a root function for all deeper processing in 2D alg.
+    -
+    Please see illustrations:
+    https://github.com/boris-kz/CogAlg/blob/master/frame_2D_alg/Illustrations/blob_params.drawio
+    https://github.com/boris-kz/CogAlg/blob/master/frame_2D_alg/Illustrations/frame_blobs.png
     https://github.com/boris-kz/CogAlg/blob/master/frame_2D_alg/Illustrations/frame_blobs_intra_blob.drawio
 '''
 
@@ -33,7 +37,7 @@ from collections import deque
 from draw_frame_blobs import visualize_blobs
 from utils import minmax
 from collections import namedtuple
-from class_cluster import ClusterStructure, NoneType
+from class_cluster import ClusterStructure, NoneType, Cdm
 
 ave = 30  # filter or hyper-parameter, set as a guess, latter adjusted by feedback
 aveB = 50
@@ -45,8 +49,9 @@ EXCLUDED_ID = -2
 FrameOfBlobs = namedtuple('FrameOfBlobs', 'I, Dy, Dx, G, M, blob_, dert__')
 
 
-class CDert(ClusterStructure):
-    # Dert params, comp_pixel:
+class CBlob(ClusterStructure):  # from frame_blobs only, no sub_blobs
+
+    # comp_pixel:
     I = int
     Dy = int
     Dx = int
@@ -60,27 +65,9 @@ class CDert(ClusterStructure):
     # comp_dx:
     Mdx = int
     Ddx = int
-
-class CFlatBlob(ClusterStructure):  # from frame_blobs only, no sub_blobs
-
-    # Dert params, comp_pixel:
-    I = int
-    Dy = int
-    Dx = int
-    G = int
-    M = int
-    # Dert params, comp_angle:
-    Day = complex
-    Dax = complex
-    Ga = int
-    Ma = int
-    # Dert params, comp_dx:
-    Mdx = int
-    Ddx = int
-
-    # blob params
+    # new params:
     A = int  # blob area
-    sign = NoneType
+    sign = bool
     box = list
     mask__ = object
     dert__ = object
@@ -88,47 +75,18 @@ class CFlatBlob(ClusterStructure):  # from frame_blobs only, no sub_blobs
     adj_blobs = list
     prior_forks = list
     fopen = bool
-
-class CBlob(ClusterStructure):
-
-    # Dert params, comp_pixel:
-    I = int
-    Dy = int
-    Dx = int
-    G = int
-    M = int
-    # Dert params, comp_angle:
-    Day = complex
-    Dax = complex
-    Ga = int
-    Ma = int
-    # Dert params, comp_dx:
-    Mdx = int
-    Ddx = int
-
-    # blob params:
-    A = int  # blob area
-    sign = NoneType
-    box = list
-    mask__ = bool
-    dert__ = tuple  # 2D array per param
-    root_dert__ = tuple
-    fopen = bool     # the blob is bordering masked area
+    # intra_blob params:
     f_root_a = bool  # input is from comp angle
     f_comp_a = bool  # current fork is comp angle
     fflip = bool     # x-y swap
     rdn = float      # redundancy to higher blob layers
-    rng = int        # comp range
-    # deep and external params:
+    rng = int        # comp range, set before intra_comp
+    # derivation hierarchy:
     Ls = int   # for visibility and next-fork rdn
     sub_layers = list
-    a_depth = int  # currently not used
-
-    prior_forks = list
-    adj_blobs = list  # for borrowing and merging
+    # comp_slice:
     dir_blobs = list  # primarily vertically | laterally oriented edge blobs
     fsliced = bool
-
     PPmm_ = list  # comp_slice_ if not empty
     PPdm_ = list  # comp_slice_ if not empty
     derP__ = list
@@ -137,16 +95,13 @@ class CBlob(ClusterStructure):
     PPdd_ = list  # PP_derPd_
     derPd__ = list
     Pd__ = list
-
-    # comp blobs
-    DerBlob = object
-    derBlob_ = list
-    distance = int  # common per derBlob_
-    neg_mB = int    # common per derBlob_
+    # from comp_blob:
+    derBlob__ = list
+    # from form_bblob:
+    root_bblob = object
 
 
-def comp_pixel(image):  # 2x2 pixel cross-correlation within image, a standard edge detection operator
-    # see comp_pixel_versions file for other versions and more explanation
+def comp_pixel(image):  # 2x2 pixel cross-correlation within image, see comp_pixel_versions file for other versions and more explanation
 
     # input slices into sliding 2x2 kernel, each slice is a shifted 2D frame of grey-scale pixels:
     topleft__ = image[:-1, :-1]
@@ -154,20 +109,16 @@ def comp_pixel(image):  # 2x2 pixel cross-correlation within image, a standard e
     bottomleft__ = image[1:, :-1]
     bottomright__ = image[1:, 1:]
 
-    rot_Gy__ = bottomright__ - topleft__  # rotated to bottom__ - top__
-    rot_Gx__ = topright__ - bottomleft__  # rotated to right__ - left__
+    d_upleft__ = bottomright__ - topleft__
+    d_upright__= bottomleft__ - topright__
 
-    G__ = (np.hypot(rot_Gy__, rot_Gx__) - ave).astype('int')
-    # deviation of central gradient per kernel, between four vertex pixels
-    M__ = int(ave * 1.2) - (abs(rot_Gy__) + abs(rot_Gx__))
-    # inverse deviation of SAD, which is a measure of variation. Ave * coeff = ave_SAD / ave_G, 1.2 is a guess
+    G__ = (np.hypot(d_upleft__, d_upright__) - ave)  # deviation of kernel gradient, between four pixels
+    # M__ = ave - (abs(Gy__) + abs(Gx__))  # inverse deviation of SAD, a measure of variation, redundant here
+    p__ = topleft__ + topright__ + bottomleft__ + bottomright__  # sum of 4 rim pixels
 
-    return (topleft__, rot_Gy__, rot_Gx__, G__, M__)  # tuple of 2D arrays per param of dert (derivatives' tuple)
-    # renamed dert__ = (p__, dy__, dx__, g__, m__) for readability in functions below
+    return (p__, d_upleft__, d_upright__, G__)  # tuple of 2D arrays per param of dert (derivatives' tuple)
+    # renamed dert__ = (p__, dy__, dx__, g__) for readability in functions below
 '''
-    rotate dert__ 45 degrees clockwise, convert diagonals into orthogonals to avoid summation, which degrades accuracy of Gy, Gx
-    Gy, Gx are used in comp_a, which returns them, as well as day, dax back to orthogonal
-    
     Sobel version:
     Gy__ = -(topleft__ - bottomright__) - (topright__ - bottomleft__)   # decomposition of two diagonal differences into Gy
     Gx__ = -(topleft__ - bottomright__) + (topright__ - bottomleft__))  # decomposition of two diagonal differences into Gx
@@ -203,15 +154,6 @@ def derts2blobs(dert__, verbose=False, render=False, use_c=False):
     return frame
 
 
-def accum_blob_Dert(blob, dert__, y, x):
-
-    blob.Dert.I += dert__[0][y, x]
-    blob.Dert.Dy += dert__[1][y, x]
-    blob.Dert.Dx += dert__[2][y, x]
-    blob.Dert.G += dert__[3][y, x]
-    blob.Dert.M += dert__[4][y, x]
-
-
 def flood_fill(dert__, sign__, verbose=False, mask__=None, blob_cls=CBlob, fseg=False, prior_forks=[]):
 
     if mask__ is None: # non intra dert
@@ -228,26 +170,6 @@ def flood_fill(dert__, sign__, verbose=False, mask__=None, blob_cls=CBlob, fseg=
         progress = 0.0
         print(f"\rClustering... {round(progress)} %", end="");  sys.stdout.flush()
 
-    # init dert instance for accumulation
-    dert__instance = [[[] for _ in range(width)] for _ in range(height)]
-    for y in range(height):
-        for x in range(width):
-            # comp_pixel:
-            dert__instance[y][x] = CDert(I  = dert__[0][y,x],
-                                         Dy = dert__[1][y,x],
-                                         Dx = dert__[2][y,x],
-                                         G  = dert__[3][y,x],
-                                         M  = dert__[4][y,x])
-            if len(dert__)>8:
-                # comp_angle:
-                dert__instance[y][x].Day += dert__[5][y,x]
-                dert__instance[y][x].Dax += dert__[6][y,x]
-                dert__instance[y][x].Ga  += dert__[7][y,x]
-                dert__instance[y][x].Ma  += dert__[8][y,x]
-            if len(dert__)>10:
-                # comp_dx:
-                dert__instance[y][x].Mdx += dert__[9][y,x]
-                dert__instance[y][x].Ddx += dert__[10][y,x]
 
     blob_ = []
     adj_pairs = set()
@@ -255,7 +177,9 @@ def flood_fill(dert__, sign__, verbose=False, mask__=None, blob_cls=CBlob, fseg=
         for x in range(width):
             if idmap[y, x] == UNFILLED:  # ignore filled/clustered derts
                 # initialize new blob
-                blob = blob_cls(sign=sign__[y, x], root_dert__=dert__)
+                blob = blob_cls(layer0=[0 for _ in range(11)],sign=sign__[y, x], root_dert__=dert__)
+                blob.layer_names = ['I', 'G', 'M', 'Vector', 'aVector', 'Ga', 'Ma', 'A', 'Mdx', 'Ddx']
+
                 if prior_forks: # update prior forks in deep blob
                     blob.prior_forks= prior_forks.copy()
                 blob_.append(blob)
@@ -268,8 +192,26 @@ def flood_fill(dert__, sign__, verbose=False, mask__=None, blob_cls=CBlob, fseg=
                 while unfilled_derts:
                     y1, x1 = unfilled_derts.popleft()
                     # add dert to blob
-                    blob.accum_from(dert__instance[y][x])
+                    blob.accumulate(I  = dert__[0][y1][x1],
+                                    Dy = dert__[1][y1][x1],
+                                    Dx = dert__[2][y1][x1],
+                                    G  = dert__[3][y1][x1],
+                                    M  = dert__[4][y1][x1])
+                    if len(dert__)>5: # comp_angle
+                        blob.accumulate(Ga  =dert__[7][y1][x1],
+                                        Ma  =dert__[8][y1][x1])
+                        if blob.Dax==0: blob.Dax = 1
+                        sum_day = (blob.Day * dert__[5][y1][x1])
+                        sum_dax = (blob.Dax * dert__[6][y1][x1])
+                        aVector = sum_day * sum_dax
+                        # update blob
+                        blob.Day = aVector.imag
+                        blob.Day = aVector.real
+                    if len(dert__)>10: # comp_dx
+                        blob.accumulate(Mdx =dert__[9][y1][x1],
+                                        Ddx =dert__[10][y1][x1])
                     blob.A += 1
+
                     if y1 < y0:
                         y0 = y1
                     elif y1 > yn:
@@ -310,7 +252,6 @@ def flood_fill(dert__, sign__, verbose=False, mask__=None, blob_cls=CBlob, fseg=
                 xn += 1
                 blob.box = y0, yn, x0, xn
                 blob.dert__ = tuple([param_dert__[y0:yn, x0:xn] for param_dert__ in blob.root_dert__])
-                blob.dert__instance =  [ dert_row[x0:xn] for dert_row in dert__instance[y0:yn]]
                 blob.mask__ = (idmap[y0:yn, x0:xn] != blob.id)
                 blob.adj_blobs = [[],[]] # iblob.adj_blobs[0] = adj blobs, blob.adj_blobs[1] = poses
 
@@ -381,20 +322,20 @@ if __name__ == "__main__":
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('-i', '--image', help='path to image file', default='./images//toucan.jpg')
     argument_parser.add_argument('-v', '--verbose', help='print details, useful for debugging', type=int, default=1)
-    argument_parser.add_argument('-n', '--intra', help='run intra_blobs after frame_blobs', type=int, default=1)
+    argument_parser.add_argument('-n', '--intra', help='run intra_blobs after frame_blobs', type=int, default=0)
     argument_parser.add_argument('-r', '--render', help='render the process', type=int, default=0)
     argument_parser.add_argument('-c', '--clib', help='use C shared library', type=int, default=0)
     args = argument_parser.parse_args()
     image = imread(args.image)
-    # verbose = args.verbose
-    # intra = args.intra
-    # render = args.render
+    verbose = args.verbose
+    intra = args.intra
+    render = args.render
 
     start_time = time()
     dert__ = comp_pixel(image)
     frame = derts2blobs(dert__, verbose=args.verbose, render=args.render, use_c=args.clib)
 
-    if args.intra:  # call to intra_blob, omit for testing frame_blobs only:
+    if intra:  # call to intra_blob, omit for testing frame_blobs only:
 
         if args.verbose: print("\rRunning intra_blob...")
         from intra_blob import intra_blob, aveB
@@ -445,7 +386,7 @@ if __name__ == "__main__":
             print_deep_blob_forking(deep_layers)
             print("\rFinished intra_blob")
 
-        bblob_ = cross_comp_blobs(frame)
+    bblob_ = cross_comp_blobs(frame)
 
     end_time = time() - start_time
 
