@@ -50,7 +50,7 @@ class CderP(ClusterStructure):
     PP = object  # PP that derP belongs to, currently not used
 
 class CPP(CP, CderP):
-    layer1 = dict
+    #layer1 = dict #layer1 is redundant here
     derP_ = list  # constituents, maybe sub_PPm_
 
 
@@ -265,7 +265,7 @@ def comp_sublayers(_P, P, mP):  # also add dP?
                     break  # deeper P and _P sublayers are from different intra_comp forks, not comparable?
 
 
-def form_PP_(derP_):  # cluster derPs into PP s by derP sign,
+def form_PP_(derP_):  # cluster derPs into PP s by derP sign, Don't understand the purpose of this? Where its being used?
 
     PP_ = []
     derP = derP_[0]  # 1st derP
@@ -307,6 +307,7 @@ def form_PPm_(derP_):  # cluster derPs into PPm s by mP sign, eval for div_comp 
         else:
             PP.accum_from(derP.P)
             PP.accum_from(derP)  # accumulate PPm numerical params with same-name current derP params, exclusions?
+            PP.derP_.append(derP) #derP needs to be appended otherwise its just single [derP], derP_
 
     PPm_.append(PP)  # pack last PP
 
@@ -336,6 +337,8 @@ def form_PPd_(derP_):
         else:
             PP.accum_from(derP.P)
             PP.accum_from(derP)
+            PP.derP_.append(derP) #derP needs to be appended otherwise its just single [derP], derP_
+
 
     PPd_.append(PP)
     return PPd_
@@ -483,7 +486,7 @@ def eval_params(PPm_):
 
     for PP in PPm_:  # interae ove PPm_ in search of strong Ps
         if PP.layer1:  # if layer1 is not empty
-            for param_name in PP.layer0:
+            for param_name in PP.layer1:    #layer0 is currently not defined so better to get param_name from layer1, layer0 might add redundancy
                 if PP.layer1[param_name].m > ave_M:
                     form_Pp_draft(PP, param_name, fPd = False)
                 if PP.layer1[param_name].d > ave_D:
@@ -493,28 +496,33 @@ def eval_params(PPm_):
 def form_Pp_draft(PP, param_name, fPd):
 
     rdn = layer0_rdn[param_name]
-    if fPd:
+    if fPd: 
         _sign = PP.derP_[0].layer1[param_name].d > 0
-    else: _sign = PP.derP_[0].layer1[param_name].m > 0
+    else: 
+        _sign = PP.derP_[0].layer1[param_name].m > 0
 
     # probably needs extension:
     Pp = CP(derP_=[PP.derP_[0]], _smP=False, sign=_sign)
 
     for derP in PP.derP[1:]:
         if fPd:
-            sign = derP.layer1[param_name].d > 0
-        else: sign = derP.layer1[param_name].m > 0
+            d = derP.layer1[param_name].d   # better to initialize here, will be used in the accumulations
+            sign =  d > 0
+        else: 
+            m = derP.layer1[param_name].m
+            sign = m > 0
 
         if sign == _sign:
             if fPd: Pp_ = "Ppd_"
             else: Pp_ = "Ppm_"
             PP.layer1[param_name].Pp_.append(Pp)
-            # add Pp initialization here
+            # Pp initialization
+            Pp.L, Pp.D, Pp.M, Pp.dert_ = 0, 0, 0, []
         else:
-            # edit a bunch
-            Pp.L += 1; Pp.M += m * rdn
+            # Separate accumulations based on fPd
+            if fPd: Pp.L += 1; Pp.D += d * rdn
+            else: Pp.L += 1; Pp.M += m * rdn
             Pp.dert_.append(dert)
-
         _sign = sign
 
 '''
