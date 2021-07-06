@@ -382,7 +382,7 @@ if __name__ == "__main__":
     frame_of_patterns_ = cross_comp(image)  # returns Pm__
 
 
-    fline_PPs = 0
+    fline_PPs = 1
     if fline_PPs:  # debug line_PPs_draft
         from line_PPs_draft import *
         frame_PP_ = []

@@ -303,7 +303,7 @@ class ClusterStructure(metaclass=MetaCluster):
 
 
 
-class Cdm(Number):
+class Cdm_(Number):
 
     __slots__ = ('d', 'm')
 
@@ -322,7 +322,7 @@ class Cdm(Number):
             return "Cdm(d={}, m={})".format(self.d, self.m)
 
 # Kelvin:
-class Cdm_(Number):
+class Cdm(Number):
     __slots__ = ('d', 'Ppd_' ,'m', 'Ppm_')
 
     def __init__(self, d=0,Ppd_=[], m=0, Ppm_=[]):

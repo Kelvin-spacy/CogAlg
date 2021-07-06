@@ -115,10 +115,12 @@ def search(P_):  # cross-compare patterns within horizontal line
 
     if derP_:
         PPm_ = form_PP_(derP_, fPd=False)  # cluster derPs into PPms by the sign of mP
+        eval_params(PPm_)
 
     if len(derP_d_)>1:
         derP_d_ = form_adjacent_mP(derP_d_)
         PPd_ = form_PP_(derP_d_, fPd=True)  # cluster derP_ds into PPds by the sign of vdP
+        eval_params(PPd_)
 
     return PPm_, PPd_
 
@@ -126,22 +128,28 @@ def search(P_):  # cross-compare patterns within horizontal line
 def sub_search_recursive(P_, fderP):  # search in sublayer[0] per P
     
     for P in P_:
-        sub_P_ = P.sublayers[0][5]  
-        if len(sub_P_) > 2:
-            PM = P.M; PD = P.D
-            if fderP:
-                PM += P.derP.mP; PD += P.derP.mP  # include match added by last search
+        if P.sublayers:
+            for sublayer in P.sublayers[0]:  # top layer only
+                sub_P_ = sublayer[5]
+                if len(sub_P_) > 2:
+                    PM = P.M;
+                    PD = P.D
+                    if fderP:
+                        PM += P.derP.mP;
+                        PD += P.derP.mP  # include match added by last search
 
-            if P.fPd:
-                if abs(PD) > ave_D:  # better use sublayers.D|M, but we don't have it yet
-                    sub_PPm_, sub_PPd_ = search(sub_P_)
-                    P.sublayers[0][6] += sub_PPm_; P.sublayers[0][7] += sub_PPd_  # extended in line_patterns
-                    sub_search_recursive(sub_P_, fderP=1)  # deeper sublayers search is selective per sub_P
+                    if P.fPd:
+                        if abs(PD) > ave_D:  # better use sublayers.D|M, but we don't have it yet
+                            sub_PPm_, sub_PPd_ = search(sub_P_)
+                            sublayer[6].append(sub_PPm_);
+                            sublayer[7].append(sub_PPd_)  # extended in line_patterns
+                            sub_search_recursive(sub_P_, fderP=1)  # deeper sublayers search is selective per sub_P
 
-            elif PM > ave_M:
-                sub_PPm_, sub_PPd_ = search(sub_P_)
-                P.sublayers[0][6] += sub_PPm_; P.sublayers[0][7] += sub_PPd_  # extended in line_patterns
-                sub_search_recursive(sub_P_, fderP=1)  # deeper sublayers search is selective per sub_P
+                    elif PM > ave_M:
+                        sub_PPm_, sub_PPd_ = search(sub_P_)
+                        sublayer[6].append(sub_PPm_);
+                        sublayer[7].append(sub_PPd_)  # extended in line_patterns
+                        sub_search_recursive(sub_P_, fderP=1)  # deeper sublayers search is selective per sub_P
 
 
 def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate cross-comp, _smP = 0 in line_patterns
@@ -294,7 +302,7 @@ def form_PP_(derP_, fPd):  # cluster derPs into PP s by derP sign,
             PP.accum_from(derP)  # accumulate PPm numerical params with same-name current derP params, exclusions?
             PP.derP_.append(derP)
 
-        _sign - sign
+        _sign = sign
 
     PP_.append(PP)  # pack last PP
 
@@ -457,30 +465,35 @@ def eval_params(PPm_):
 def form_Pp_draft(PP, param_name, fPd):
 
     rdn = layer0_rdn[param_name]
-    if fPd: _sign = PP.derP_[0].layer1[param_name].d > 0
-    else:   _sign = PP.derP_[0].layer1[param_name].m > 0
+    if PP.derP_[0].layer1:
+        if fPd: _sign = PP.derP_[0].layer1[param_name].d > 0
+        else:   _sign = PP.derP_[0].layer1[param_name].m > 0
 
-    # needs extension:
-    Pp = CP(_smP=False, sign=_sign)
+        # needs extension:
+        Pp = CP(_smP=False, sign=_sign)
+    else:
+        _sign = False
+        Pp = CP(_smP=False, sign=_sign) #Add layer1?
 
-    for derP in PP.derP[1:]:
-        d = derP.layer1[param_name].d
-        m = derP.layer1[param_name].m
-        if fPd: sign = d > 0
-        else:   sign = m > 0
+    for derP in PP.derP_[1:]:
+        if derP.layer1:
+            d = derP.layer1[param_name].d
+            m = derP.layer1[param_name].m
+            if fPd: sign = d > 0
+            else:   sign = m > 0
 
-        if sign != _sign:
-            if fPd: PP.layer1[param_name].Ppd_.append(Pp)
-            else:   PP.layer1[param_name].Ppm_.append(Pp)
-            Pp = CP(_smP=False, sign=_sign)
-        else:
-            # accumulate Pp params
-            Pp.L += 1
-            Pp.D += d
-            Pp.M += m
-            Pp.dert_.append((d,m))
+            if sign != _sign:
+                if fPd: PP.layer1[param_name].Ppd_.append(Pp)
+                else:   PP.layer1[param_name].Ppm_.append(Pp)
+                Pp = CP(_smP=False, sign=_sign)
+            else:
+                # accumulate Pp params
+                Pp.L += 1
+                Pp.D += d
+                Pp.M += m
+                Pp.dert_.append((d,m))
 
-        _sign = sign
+            _sign = sign
 
 '''
     comp_P draft - Needs further changes
