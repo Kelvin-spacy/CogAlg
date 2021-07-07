@@ -42,8 +42,9 @@ class CP(ClusterStructure):
     D = int
     M = int
     x0 = int
-    p_ = list
-    d_ = list
+    p_ = list  # accumulated with rng
+    d_ = list  # accumulated with rng
+    m_ = list
     sublayers = list
     # for line_PPs
     derP = object  # forward comp_P derivatives
@@ -104,7 +105,7 @@ def form_P_(p_, d_, fPd):  # initialization, accumulation, termination
     if fPd: _sign = _d > 0
     else: _sign = _m > 0
 
-    P = CP(sign=_sign, L=1, I=_p, D=_d, M=_m, x0=0, p_=[_p], d_=[_d], sublayers=[], _smP=False, fPd=fPd)
+    P = CP(sign=_sign, L=1, I=_p, D=_d, M=_m, x0=0, p_=[_p], d_=[_d],m_=[_m], sublayers=[], _smP=False, fPd=fPd)
     # segment by m sign:
     for p, d in zip( p_[1:], d_[1:] ):
         m = ave - abs(d)
@@ -114,11 +115,11 @@ def form_P_(p_, d_, fPd):  # initialization, accumulation, termination
         if sign != _sign:  # sign change, terminate P
             P_.append(P)
             # re-initialization:
-            P = CP(sign=_sign, L=1, I=p, D=d, M=m, x0=x-(P.L-1), p_=[p], d_=[d], sublayers=[], _smP=False, fPd=fPd)
+            P = CP(sign=_sign, L=1, I=p, D=d, M=m, x0=x-(P.L-1), p_=[p], d_=[d], m_=[m], sublayers=[], _smP=False, fPd=fPd)
         else:
             # accumulate params:
             P.L += 1; P.I += p; P.D += d; P.M += m
-            P.p_ += [p]; P.d_ += [d]
+            P.p_ += [p]; P.d_ += [d]; P.m_ +=[m]
 
         _sign = sign
         x += 1
@@ -237,25 +238,19 @@ def intra_Pd_(Pd_, irp_, rel_adj_M, rdn, rng):  # evaluate for sub-recursion in 
 
 
 def range_comp(p_, rp_, rd_):
-    # no rp_, rd_ = [], []: should be cumulative? unless preserve rim layers
 
+    rng_p_, rng_d_ = [], []  # returned as rp_, rd_
     p_ = p_[::2]  # sparse p_ and d_, skipping odd ps compared in prior rng: 1 skip / 1 add, to maintain 2x overlap
     rp_ = rp_[::2]
     rd_ = rd_[::2]
-
     _p = p_[0]
-    _pri_rng_p = rp_[0]
-    _pri_rng_d = rd_[0]
 
-    rng_p_ = [_pri_rng_p]
-    rng_d_ = [_pri_rng_d]
-
-    for p, pri_rng_p, pri_rng_d in zip(p_[1:], rp_[1:], rd_[1:]):
+    for p, rp, rd in zip(p_[1:], rp_, rd_):
         d = p -_p
-        rng_p =_p + pri_rng_p  # intensity accumulated in rng
-        rng_d = d + pri_rng_d  # difference accumulated in rng
-        rng_p_.append(rng_p)
-        rng_d_.append(rng_d)
+        rp += _p  # intensity accumulated in rng
+        rd += d  # difference accumulated in rng
+        rng_p_.append(rp)
+        rng_d_.append(rd)
         _p = p
 
     return rng_p_, rng_d_
@@ -274,7 +269,7 @@ def deriv_comp(d_):  # cross-comp consecutive ds in same-sign dert_: sign match 
         md_.append(md)
         _d = d
 
-    return md_, dd_  # if fid: P. rp_ = md_
+    return md_, dd_  # if fid: P. rp_ = md_?
 
 
 def cross_comp_spliced(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patterns, each pattern maybe nested
@@ -317,7 +312,7 @@ if __name__ == "__main__":
     # Main
     frame_of_patterns_ = cross_comp(image)  # returns Pm__
 
-    fline_PPs = 0
+    fline_PPs = 1
     if fline_PPs:  # debug line_PPs_draft
         from line_PPs_draft import *
         frame_PP_ = []

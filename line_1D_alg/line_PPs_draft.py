@@ -171,13 +171,13 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
         layer1[param_name] = dm
 
     if neg_L == 0:
-        mP += _P.dert_[0].m; dP += _P.dert_[0].d
+        mP += _P.m_[0]; dP += _P.d_[0]
 
     rel_distance = neg_L / _P.L
 
     if mP / max(rel_distance, 1) > ave_merge:  # merge(_P, P): splice proximate and param/L- similar Ps:
         _P.accum_from(P)
-        _P.dert_+= P.dert_
+        _P.d_[0]+= P.d_[0];_P.p_[0]+= P.p_[0];_P.m_[0]+= P.m_[0];
         remove_index.append(j)
         if _P.fPd: _P.sign = P.D > 0
         else: P.sign = P.M > 0
