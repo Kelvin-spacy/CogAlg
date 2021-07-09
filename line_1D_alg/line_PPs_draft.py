@@ -103,6 +103,7 @@ def search(P_):  # cross-compare patterns within horizontal line
                                 neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
                     else:
                         derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=_P, layer1={}))
+                        print(len(derP_))
                         # sign is ORed bilaterally, negative for singleton derPs only
                         break  # neg net_M: stop search
 
@@ -110,13 +111,13 @@ def search(P_):  # cross-compare patterns within horizontal line
         del P_[index]  # delete the merged Ps
 
     if derP_:
+        derP_ = eval_params(derP_,True) #need to check manually for fPd True and False? OR to define a criteria like in the eval_params?
+        derP_ = eval_params(derP_,False)
         PPm_ = form_PP_(derP_, fPd=False)  # cluster derPs into PPms by the sign of mP
-        eval_params(PPm_)
 
     if len(derP_d_)>1:
         derP_d_ = form_adjacent_mP(derP_d_)
         PPd_ = form_PP_(derP_d_, fPd=True)  # cluster derP_ds into PPds by the sign of vdP
-        eval_params(PPd_)
 
     return PPm_, PPd_
 
@@ -162,13 +163,15 @@ def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate 
         layer1[param_name] = dm
 
     if neg_L == 0:
-        mP += _P.dert_[0].m; dP += _P.dert_[0].d
+        mP += _P.m_[0]; dP += _P.d_[0]
 
     rel_distance = neg_L / _P.L
 
     if mP / max(rel_distance, 1) > ave_merge:  # merge(_P, P): splice proximate and param/L- similar Ps:
         _P.accum_from(P)
-        _P.dert_+= P.dert_
+        _P.d_[0]+= P.d_[0];
+        _P.p_[0]+= P.p_[0];
+        _P.m_[0]+= P.m_[0];
         remove_index.append(j)
         if _P.fPd: _P.sign = P.D > 0
         else: P.sign = P.M > 0
@@ -264,7 +267,7 @@ def comp_sublayers(_P, P, mP):  # also add dP?
                     break  # deeper P and _P sublayers are from different intra_comp forks, not comparable?
 
 
-def form_PP_(derP_, fPd):  # cluster derPs into PP s by derP sign
+def form_PP_draft(derP_, fPd):  # cluster derPs into PP s by derP sign
 
     PP_ = []
     derP = derP_[0]
@@ -432,7 +435,7 @@ def rng_search(P_, ave):
     return sub_PPm_
 
 
-def eval_params(PPm_):
+def eval_params(PPm_): #not sre if this is needed
 
     for PP in PPm_:  # interae ove PPm_ in search of strong Ps
         if PP.layer1:  # how can layer1 be empty?
@@ -446,33 +449,35 @@ def eval_params(PPm_):
                     if M > ave_M: form_Pp_(PP, param_name, fPd = False)
                     if D > ave_D: form_Pp_(PP, param_name, fPd = True)
 
-
-def form_Pp_(PP, param_name, fPd):
+def form_Pp_draft(derP_, fPd):
 
     rdn = layer0_rdn[param_name]
-    if fPd: _sign = PP.derP_[0].layer1[param_name].d > 0
-    else:   _sign = PP.derP_[0].layer1[param_name].m > 0
+    if fPd: _sign = derP_[0].layer1[param_name].d > 0
+    else:   _sign = derP[0].layer1[param_name].m > 0
 
     Pp = CP(_smP=False, sign=_sign)  # both probably not needed
 
-    for derP in PP.derP_[1:]:
-        d = derP.layer1[param_name].d
-        m = derP.layer1[param_name].m
-        if fPd: sign = d > 0
-        else:   sign = m > 0
+    for i,derP in enumerate(derP_, start=1):
+        for param_name in derP.layer1:142
 
-        if sign != _sign:
-            if fPd: PP.layer1[param_name].Ppd_.append(Pp)
-            else:   PP.layer1[param_name].Ppm_.append(Pp)
-            Pp = CP(_smP=False, sign=_sign)  # both probably not needed
-        else:
-            # accumulate Pp params
-            Pp.L += 1
-            Pp.D += d
-            Pp.M += m
-            Pp.dert_.append((d,m))
+            d = derP.layer1[param_name].d
+            m = derP.layer1[param_name].m
+            if fPd: sign = d > 0
+            else:   sign = m > 0
 
-        _sign = sign
+            if sign != _sign:
+                if fPd: derP_[i+1].layer1[param_name].Ppd_+=[Pp]
+                else:   derP_[i+1].layer1[param_name].Ppm_+=[Pp]
+                Pp = CP(_smP=False, sign=_sign)  # both probably not needed
+            else:
+                # accumulate Pp params
+                Pp.L += 1
+                Pp.D += d
+                Pp.M += m
+                Pp.d_ +=[d]
+                Pp.m_ += [m]
+            _sign = sign
+    return derP_
 
 '''
     comp_P draft - Needs further changes
