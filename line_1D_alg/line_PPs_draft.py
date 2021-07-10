@@ -111,8 +111,11 @@ def search(P_):  # cross-compare patterns within horizontal line
         del P_[index]  # delete the merged Ps
 
     if derP_:
-        derP_ = eval_params(derP_,True) #need to check manually for fPd True and False? OR to define a criteria like in the eval_params?
-        derP_ = eval_params(derP_,False)
+        # too many function calls shold the eval_Pp be called from form_Pp?
+        derP_ = form_Pp_(derP_,True) #need to check manually for fPd True and False? OR to define a criteria like in the eval_params?
+        derP_ = eval_Pp_(derP_,True)
+        derP_ = form_Pp_(derP_,False)
+        derP_ = eval_Pp_(derP_,False)
         PPm_ = form_PP_(derP_, fPd=False)  # cluster derPs into PPms by the sign of mP
 
     if len(derP_d_)>1:
@@ -268,6 +271,7 @@ def comp_sublayers(_P, P, mP):  # also add dP?
 
 
 def form_PP_draft(derP_, fPd):  # cluster derPs into PP s by derP sign
+    #how the form_PP sequence should work now?
 
     PP_ = []
     derP = derP_[0]
@@ -435,21 +439,47 @@ def rng_search(P_, ave):
     return sub_PPm_
 
 
-def eval_params(PPm_): #not sre if this is needed
+def eval_Pp(derP_,fPd): # Remove low value Pps and merge into negative Pp
+    Pp_ = []
+    remove_index = []
+    for i,derP in enumerate(derP_):  # interae ove PPm_ in search of strong Ps
+        if derP.layer1:  # how can layer1 be empty?
+            for param_name in derP.layer1
+                if fPd:
+                    Pp.append(derP.layer1.Ppd_[0])
+                    for j,Pp in enumerate(derP.layer1.Ppd_):
+                        if not Pp.sign: # if negative Pps then merge low value Pps
+                            for _Pp in Pp_:
+                                Pp.accum_from(_Pp)  #merge all low value Ppsinto negative Pp
+                            derP_[i].layer1.Ppd_[j] = Pp
 
-    for PP in PPm_:  # interae ove PPm_ in search of strong Ps
-        if PP.layer1:  # how can layer1 be empty?
-            for param_name in PP.layer1:
+                        else:
+                            if Pp.D < ave_param_d:  #low value Pp? ave_param_d=?
+                                Pp_.append(Pp)
+                                remove_index.append(j) #get low value Pps index
+                    for index in sorted(remove_index, reverse=True):
+                        del derP.Ppd_[index]
+                    remove_index = []
+                else:
+                    Pp_.append(derP.layer1.Ppm_[0])
+                    for j,Pp in enumerate(derP.layer1.Ppm_):
+                        if not Pp.sign: # if negative Pps then merge low value Pps
+                            for _Pp in Pp_:
+                                Pp.accum_from(_Pp)  #merge all low value Ppsinto negative Pp
+                            derP_[i].layer1.Ppm_[j] = Pp
 
-                M = PP.layer1[param_name].m - ave_M
-                D = PP.layer1[param_name].d - ave_D
-                if M > 0 or D > 0:
-                    if M > D: D -= ave_D
-                    else: M -= ave_M  # filter*2 if redundant
-                    if M > ave_M: form_Pp_(PP, param_name, fPd = False)
-                    if D > ave_D: form_Pp_(PP, param_name, fPd = True)
+                        else:
+                            if Pp.M < ave_param_m:  #low value Pp? ave_param_m=?
+                                Pp_.append(Pp)
+                                remove_index.append(j) #get low value Pps index
+                    for index in sorted(remove_index, reverse=True):
+                        del derP.Ppm_[index]
+                    remove_index = []
+    return derP_
 
-def form_Pp_draft(derP_, fPd):
+
+                
+def form_Pp_(derP_, fPd):
 
     rdn = layer0_rdn[param_name]
     if fPd: _sign = derP_[0].layer1[param_name].d > 0
@@ -458,7 +488,7 @@ def form_Pp_draft(derP_, fPd):
     Pp = CP(_smP=False, sign=_sign)  # both probably not needed
 
     for i,derP in enumerate(derP_, start=1):
-        for param_name in derP.layer1:142
+        for param_name in derP.layer1:
 
             d = derP.layer1[param_name].d
             m = derP.layer1[param_name].m
