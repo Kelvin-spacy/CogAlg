@@ -113,9 +113,7 @@ def search(P_):  # cross-compare patterns within horizontal line
     if derP_:
         # too many function calls shold the eval_Pp be called from form_Pp?
         derP_ = form_Pp_(derP_,True) #need to check manually for fPd True and False? OR to define a criteria like in the eval_params?
-        derP_ = eval_Pp_(derP_,True)
         derP_ = form_Pp_(derP_,False)
-        derP_ = eval_Pp_(derP_,False)
         PPm_ = form_PP_(derP_, fPd=False)  # cluster derPs into PPms by the sign of mP
 
     if len(derP_d_)>1:
@@ -439,42 +437,33 @@ def rng_search(P_, ave):
     return sub_PPm_
 
 
-def eval_Pp(derP_,fPd): # Remove low value Pps and merge into negative Pp
-    Pp_ = []
+def merge_Pp(derP_,fPd=None): # Remove low value Pps and merge into negative Pp
+    neg_Pp_ = []
     remove_index = []
     for i,derP in enumerate(derP_):  # interae ove PPm_ in search of strong Ps
         if derP.layer1:  # how can layer1 be empty?
             for param_name in derP.layer1
-                if fPd:
-                    Pp.append(derP.layer1.Ppd_[0])
-                    for j,Pp in enumerate(derP.layer1.Ppd_):
-                        if not Pp.sign: # if negative Pps then merge low value Pps
-                            for _Pp in Pp_:
-                                Pp.accum_from(_Pp)  #merge all low value Ppsinto negative Pp
-                            derP_[i].layer1.Ppd_[j] = Pp
+                if fPd: Pp_ = derP.layer1[param_name].Ppm_
+                else: Pp_ = derP.layer1[param_name].Ppd_
 
-                        else:
-                            if Pp.D < ave_param_d:  #low value Pp? ave_param_d=?
-                                Pp_.append(Pp)
-                                remove_index.append(j) #get low value Pps index
-                    for index in sorted(remove_index, reverse=True):
-                        del derP.Ppd_[index]
-                    remove_index = []
-                else:
-                    Pp_.append(derP.layer1.Ppm_[0])
-                    for j,Pp in enumerate(derP.layer1.Ppm_):
-                        if not Pp.sign: # if negative Pps then merge low value Pps
-                            for _Pp in Pp_:
-                                Pp.accum_from(_Pp)  #merge all low value Ppsinto negative Pp
-                            derP_[i].layer1.Ppm_[j] = Pp
+                for j,Pp in enumerate(Pp_):
+                    if fPd: Pparam = Pp.M 
+                    else: Pparam = Pp.M
+                    if abs(Pparam) < ave: # get low value negative Pps
+                        neg_Pp_.append(Pp)
+                        remove_index.append(j) 
+                if neg_Pp_:
+                    _neg_Pp = neg_Pp_[0]
+                    for i,neg_Pp in enumerate(neg_Pp_,start=1):
+                        _neg_Pp.accum_from(neg_Pp) #accumulate all neg_Pps 
+                    if fPd: derP_[i].layere1[param_name].Ppm_[0] = neg_Pp_[0]  #replace first Pp in Pp_ with accumulated neg_Pp
+                    else: derP_[i].layere1[param_name].Ppd_[0] = neg_Pp_[0]
 
-                        else:
-                            if Pp.M < ave_param_m:  #low value Pp? ave_param_m=?
-                                Pp_.append(Pp)
-                                remove_index.append(j) #get low value Pps index
-                    for index in sorted(remove_index, reverse=True):
-                        del derP.Ppm_[index]
-                    remove_index = []
+                for index in sorted(remove_index, reverse=True):    # remove all merged Ppd from original Pp_
+                    if fpd: del derP.layer1[param_name].Ppm_[index]
+                    else: del derP.layer1[param_name].Ppm_[index]
+                remove_index = []
+                
     return derP_
 
 
@@ -507,6 +496,8 @@ def form_Pp_(derP_, fPd):
                 Pp.d_ +=[d]
                 Pp.m_ += [m]
             _sign = sign
+    if fPd: derP_ = merge_Pp_(derP_, fPd=True)
+    else: derP_ = merge_Pp_(derP_, fPd=False)
     return derP_
 
 '''
