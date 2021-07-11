@@ -111,9 +111,8 @@ def search(P_):  # cross-compare patterns within horizontal line
         del P_[index]  # delete the merged Ps
 
     if derP_:
-        # too many function calls shold the eval_Pp be called from form_Pp?
-        derP_ = form_Pp_(derP_,True) #need to check manually for fPd True and False? OR to define a criteria like in the eval_params?
-        derP_ = form_Pp_(derP_,False)
+        form_Pp_(derP_,True) #need to check manually for fPd True and False? OR to define a criteria like in the eval_params?
+        form_Pp_(derP_,False)
         PPm_ = form_PP_(derP_, fPd=False)  # cluster derPs into PPms by the sign of mP
 
     if len(derP_d_)>1:
@@ -448,7 +447,7 @@ def merge_Pp(derP_,fPd=None): # Remove low value Pps and merge into negative Pp
 
                 for j,Pp in enumerate(Pp_):
                     if fPd: Pparam = Pp.M 
-                    else: Pparam = Pp.M
+                    else: Pparam = Pp.D
                     if abs(Pparam) < ave: # get low value negative Pps
                         neg_Pp_.append(Pp)
                         remove_index.append(j) 
@@ -456,16 +455,15 @@ def merge_Pp(derP_,fPd=None): # Remove low value Pps and merge into negative Pp
                     _neg_Pp = neg_Pp_[0]
                     for i,neg_Pp in enumerate(neg_Pp_,start=1):
                         _neg_Pp.accum_from(neg_Pp) #accumulate all neg_Pps 
-                    if fPd: derP_[i].layere1[param_name].Ppm_[0] = neg_Pp_[0]  #replace first Pp in Pp_ with accumulated neg_Pp
-                    else: derP_[i].layere1[param_name].Ppd_[0] = neg_Pp_[0]
+                    if fPd: derP.layer1[param_name].Ppm_[0] = __neg_Pp #replace first Pp in Pp_ with accumulated neg_Pp
+                    else: derP.layer1[param_name].Ppd_[0] = _neg_Pp
+                    _neg_Pp = None
 
                 for index in sorted(remove_index, reverse=True):    # remove all merged Ppd from original Pp_
                     if fpd: del derP.layer1[param_name].Ppm_[index]
-                    else: del derP.layer1[param_name].Ppm_[index]
+                    else: del derP.layer1[param_name].Ppd_[index]
                 remove_index = []
                 
-    return derP_
-
 
                 
 def form_Pp_(derP_, fPd):
@@ -485,8 +483,8 @@ def form_Pp_(derP_, fPd):
             else:   sign = m > 0
 
             if sign != _sign:
-                if fPd: derP_[i+1].layer1[param_name].Ppd_+=[Pp]
-                else:   derP_[i+1].layer1[param_name].Ppm_+=[Pp]
+                if fPd: derP.layer1[param_name].Ppd_+=[Pp]
+                else:   derP.layer1[param_name].Ppm_+=[Pp]
                 Pp = CP(_smP=False, sign=_sign)  # both probably not needed
             else:
                 # accumulate Pp params
@@ -496,9 +494,8 @@ def form_Pp_(derP_, fPd):
                 Pp.d_ +=[d]
                 Pp.m_ += [m]
             _sign = sign
-    if fPd: derP_ = merge_Pp_(derP_, fPd=True)
-    else: derP_ = merge_Pp_(derP_, fPd=False)
-    return derP_
+    if fPd: merge_Pp_(derP_, fPd=True)
+    else: merge_Pp_(derP_, fPd=False)
 
 '''
     comp_P draft - Needs further changes
