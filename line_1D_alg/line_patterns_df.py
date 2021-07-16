@@ -1,4 +1,5 @@
 '''
+
   line_patterns is a principal version of 1st-level 1D algorithm
   Operations:
 - Cross-compare consecutive pixels within each row of image, forming dert_: queue of derts, each a tuple of derivatives per pixel.
@@ -44,13 +45,14 @@ init_y = 0  # starting row, the whole frame doesn't need to be processed
     prefix 'F' Filtered dataframe  
 '''
 def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patterns, each pattern maybe nested
-    
+
     Y, X = frame_of_pixels_.shape  # Y: frame height, X: frame width
     frame_of_patterns_ = []
 
     for y in range(init_y + 1, Y):  # y is index of new line pixel_, a brake point here, we only need one row to process
         # initialization:
-        dert_ = []  # line-wide i_, p_, d_, m__ 
+
+        dert_ = []  # line-wide i_, p_, d_, m__
         pixel_ = frame_of_pixels_[y, :]
         _i = pixel_[0]
 
@@ -60,7 +62,7 @@ def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patter
             m = ave - abs(d)  # for consistency with deriv_comp output, otherwise redundant
             dert_.append({'i':i,'p':p,'d':d,'m':m}) #append dict to create df in the end
             _i = i
-        df_dert = pd.DataFrame(dert_) #create dert as dataframe 
+        df_dert = pd.DataFrame(dert_) #create dert as dataframe
         Pm_ = form_P_(df_dert, fPd=False)  # forms m-sign patterns
         if len(Pm_) > 4:
             adj_M_ = form_adjacent_M_(Pm_)  # compute adjacent Ms to evaluate contrastive borrow potential
@@ -87,7 +89,7 @@ def form_P_(df_dert, fPd):  # initialization, accumulation, termination
         #append dict into P_ for later assignment into dataframe
         P_.append({'sign':dert.sign>0, 'L':len(dert_), 'I':dert.p, 'D':dert.d, 'M':dert.m, 'x0':i, 'dert_':dert_, 'sublayers':[], '_smP':False, 'fPd':fPd})
     df_P = pd.DataFrame(P_) #form dataframe of P_
-    
+
     return df_P
 
 def form_adjacent_M_(Pm_):  # compute array of adjacent Ms, for contrastive borrow evaluation
