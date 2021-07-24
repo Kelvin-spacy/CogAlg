@@ -1,129 +1,257 @@
 '''
 line_PPs is a 2nd-level 1D algorithm, its input is Ps formed by the 1st-level line_patterns.
-It cross-compares Ps (s, L, I, D, M, dert_, layers) and evaluates them for deeper cross-comparison.
-Range or derivation of cross-comp is selectively increased if the match from prior-order cross-comp is above threshold,
-search up to max rel distance +|- contrast borrow, with bi-directional selection?
--
-comp s: if same-sign, cross-sign comp is borrow, also default L and M (core param) comp?
-comp (L, I, D, M): equal-weight, select redundant I | (D,M),  div L if V_var * D_vars, and same-sign d_vars?
-comp (dert_):  lower composition than layers, if any
-comp (layers):  same-derivation elements
-comp (P_):  sub patterns
--
-Increment of 2nd level alg over 1st level alg should be made recursive, forming relative-level meta-algorithm.
-Comparison distance is extended to first match or maximal accumulated miss over compared derPs, measured by roL*roM?
-Match or miss may be between Ps of either sign, but comparison of lower P layers is conditional on higher-layer match
--
-Comparison between two Ps is of variable-depth P hierarchy, with sign at the top, until max higher-layer miss.
-This is vertical induction: results of higher-layer comparison predict results of next-layer comparison,
-similar to lateral induction: variable-range comparison among Ps, until first match or max prior-Ps miss.
--
-Resulting PPs will be more like 1D graphs, with explicit distances between nearest element Ps.
-This is different from 1st level connectivity clustering, where all distances between nearest elements = 1.
-Negative PPms and PPds are not formed: contrast value can't be assumed because all Ps are terminated.
-form PPd if min(PP.(M+mP), dP) > ave_dP, then sub-recursion as div_comp ) der_comp?
-also deeper backward search for strong Pm s?
-Sub-recursion if no template replacement by nearest-match: no strict continuity
-different from range_comp in that elements can be distant, but also always positive?
+It cross-compares P params (initially L, I, D, M) and forms Pparam_ for each of them
 '''
 
-# add ColAlg folder to system path
-import sys
+import sys  # add CogAlg folder to system path
 from os.path import dirname, join, abspath
 sys.path.insert(0, abspath(join(dirname("CogAlg"), '..')))
 
-from line_patterns import CP
-from frame_2D_alg.class_cluster import ClusterStructure, comp_param, Cdm_
+from line_patterns import *
+from frame_2D_alg.class_cluster import ClusterStructure, comp_param
 
-class Cdert(ClusterStructure):
 
-    sign = bool  # bilateral? or local?
-    rrdn =int
-    mP = int
-    dP = int
+class Cpdert(ClusterStructure):
+    # P param dert
+    i = int  # input for range_comp only
+    p = int  # accumulated in rng
+    d = int  # accumulated in rng
+    m = int  # distinct in deriv_comp only
+    negL = int  # in mdert only
+    negM = int  # in mdert only
+    x0 = int  # pixel-level
+    L = int
+    # P = object  # _P of compared pair?
+
+class CPp(CP):
+    dert_ = list
+    fPd = bool  # P is Pd if true, else Pm; also defined per layer
+    negL = int  # in mdert only
+    negM = int  # in mdert only
+    sublayers = list
+
+class CderPp(ClusterStructure):
+    mPp = int
+    dPp = int
+    sign = bool
+    rrdn = int
     negM = int
     negL = int
     adj_mP = int
-    P = object
-    layer1 = dict  # d, m per comparand
+    _Pp = object
+    Pp = object
+    layer1 = dict  # dert per compared param
     der_sub_H = list  # sub hierarchy of derivatives, from comp sublayers
-    PP = object  # PP that derP belongs to, currently not used
 
-class CPP(CP, CderP):
+class CPP(CPp):
+    layer1 = dict
+    derPp_ = list
 
-    derP_ = list  # constituents, maybe sub_PPm_
-    layer1 = dict  # d,m per comparand (dict is not inherited automatically)
 
 ave = 100  # ave dI -> mI, * coef / var type
 # no ave_mP: deviation computed via rM  # ave_mP = ave* n_comp_params: comp cost, or n vars per P: rep cost?
 ave_div = 50
 ave_rM = .5  # average relative match per input magnitude, at rl=1 or .5?
+ave_negM = 10  # or rM?
 ave_M = 100  # search stop
-ave_D = 100
+ave_D = 100  # search stop
 ave_sub_M = 500  # sub_H comp filter
 ave_Ls = 3
 ave_PPM = 200
-ave_merge = -50  # merge adjacent Ps
+ave_merge = 50  # merge a kernel of 3 adjacent Pps
 ave_inv = 20 # ave inverse m, change to Ave from the root intra_blob?
 ave_min = 5  # ave direct m, change to Ave_min from the root intra_blob?
-
-layer0_rdn = {'L': .25, 'I': .5, 'D': .25, 'M': .5}  # M is doubled because it represents both comparands
+ave_rolp = .5  # ave overlap ratio for comp_Pp
 
 
 def search(P_):  # cross-compare patterns within horizontal line
 
-    sub_search_recursive(P_, fderP=0)  # search in sublayers first: proceed with incremental distance
+    # sub_search_recursive(P_, fderP=0)  # search with incremental distance: first inside sublayers
+    PP_ = []
+    layer0 = {'L_': [[],.25], 'I_': [[],.5], 'D_': [[],.25], 'M_': [[],.5]}  # M is doubled because it represents both comparands
+    if len(P_) > 1:
+        # at least 2 comparands, unpack P_:
+        for P in P_:
+            layer0['L_'][0].append((P.L, P.L, P.x0))  # L: (2 Ls for code-consistent processing later)
+            layer0['I_'][0].append((P.I, P.L, P.x0))  # I
+            layer0['D_'][0].append((P.D, P.L, P.x0))  # D
+            layer0['M_'][0].append((P.M, P.L, P.x0))  # M
 
-    # search in P_:
-    derP_ = []  # search forms array of derPs (P + P'derivatives): combined output of pair-wise comp_P
-    derP_d_ = []; PPm_ = []; PPd_ = []; remove_index = []
+        for n, param_name in enumerate(layer0):  # loop L_, I_, D_, M_
+            search_param_(param_name, layer0[param_name])  # layer0[param_name][0].append((Ppm_, Ppd_))
 
-    for i, _P in enumerate(P_):
-        if i not in remove_index:
-            neg_M = neg_L = mP = sign = dP =_smP = 0  # initialization
+    derPp__ = compute_overlap(layer0, fPd=0)
+    form_PP_(PP_, derPp__)  # form PP from current overlapping derPps
 
-            for j, P in enumerate(P_[i + 1:], start=1):  # j starts at 1, variable-range comp, no last-P displace, just shifting first _P
-                if (j+i) not in remove_index:
-                    if _P.M + neg_M > 0:  # search while net_M > ave_M * nparams or 1st P, no selection by M sign
-                        # P.M decay with distance: * ave_rM ** (1 + neg_L / P.L): only for abs P.M?
+    return PP_
 
-                        derP, _L, _smP = merge_comp_P(P_, _P, P, i, j+i, neg_M, neg_L, remove_index)
-                        if derP:
-                            sign, mP, dP, neg_M, neg_L = derP.sign, derP.mP, derP.dP, derP.neg_M, derP.neg_L
-                            derP_d_.append(derP)  # at each comp_P: induction = lend value for form_PPd_
-                            if sign:
-                                P_[j+i]._smP = True  # backward match per P, or set _smP in derP_ with empty CderPs?
+def search_param_(param_name, iparam):
 
-                                derP_.append(derP);  del derP
-                                break  # nearest-neighbour search is terminated by 1st matching P, which latter searches as _P in line 81
-                            else:
-                                neg_M += mP  # accumulate contiguous P miss, or all derivatives?
-                                neg_L += _L  # accumulate distance to matching P
-                                '''                     
-                                no contrast value in neg derPs and PPs: initial opposite-sign P miss is expected
-                                neg_derP derivatives are not significant; neg_M obviates distance * decay_rate * M '''
-                    else:
+    ddert_, mdert_ = [], []  # line-wide (i, p, d, m)_, + (negL, negM) in mdert: variable-range search
 
-                        if "derP" in locals():  # current _P has been compared before
-                            derP.sign=sign or _smP  # sign is ORed bilaterally, negative for singleton derPs only
-                            derP_.append(derP)  # vs. derP_.append( CderP(sign=sign or _smP, mP=mP,dP=dP, neg_M=neg_M, neg_L=neg_L, P=_P, layer1={}))
-                        break  # neg net_M: stop search
+    rdn = iparam[1]  # iparam = (param_, P.L, P.x0), rdn
+    param_ = iparam[0]
+    _param, _L, _x0 = param_[0]
 
-    for index in sorted(remove_index, reverse=True):
-        del P_[index]  # delete the merged Ps
+    for i, (param, L, x0) in enumerate(param_[1:], start=1):
+        # param is compared to prior-P param:
+        dert = comp_param(_param, param, param_name, ave/rdn)
+        # negL, negM stay 0:
+        ddert_.append( Cpdert( i=dert.i, p=dert.p, d=dert.d, m=dert.m, x0=x0, L=L) )
+        negL=negM=0
+        comb_M = dert.m
+        j = i
+        while comb_M > 0 and j+1 < len(param_):
+            j += 1
+            ext_param, ext_L, ext_x0 = param_[j]  # extend search beyond next param
+            dert = comp_param(param, ext_param, param_name, ave)
+            comb_M = dert.m + negM - ave_M  # adjust ave_M for relative proximity and similarity?
+            negM += dert.m
+            negL += ext_L
+        # after extended search, if any:
+        mdert_.append( Cpdert( i=dert.i, p=dert.p, d=dert.d, m=dert.m, negL=negL, negM=negM))
+        _param = param
 
-    if derP_:
+    # needs a review
+    Ppm_ = form_Pp_(mdert_, param_name, rdn, fPd=0)
+    Ppd_ = form_Pp_(ddert_, param_name, rdn, fPd=1)
 
-        form_Pp_(derP_, fPd=False)
-        # PPm_ = form_PP_(derP_, fPd=False)  # cluster derPs into PPms by the sign of mP
-        # eval_params(PPm_)
-    if len(derP_d_)>1:
-        derP_d_ = form_adjacent_mP(derP_d_)
-        form_Pp_(derP_, fPd=True)
-
-    return PPm_, PPd_
+    iparam[0] = (Ppm_, Ppd_)
 
 
+def form_Pp_(dert_, param_name, rdn, fPd):  # almost the same as line_patterns form_P_ for now
+    # initialization:
+    Pp_ = []
+    x = 0
+    _sign = None  # to initialize 1st P, (None != True) and (None != False) are both True
+
+    for dert in dert_:  # segment by sign
+        if fPd: sign = dert.d > 0
+        else:   sign = dert.m > 0  # adjust by ave projected at distance=negL and contrast=negM, if significant:
+                # m + ddist_ave = ave - ave * (ave_rM * (1 + negL / ((param.L + _param.L) / 2))) / (1 + negM / ave_negM)?
+        if sign != _sign:
+            # sign change, initialize P and append it to P_
+            Pp = CPp(sign=_sign, L=dert.L, I=dert.p, D=dert.d, M=dert.m, negL=dert.negL, negM=dert.negM, x0=dert.x0, dert_=[dert], sublayers=[], fPd=fPd)
+            Pp_.append(Pp)  # updated with accumulation below
+        else:
+            # accumulate params:
+            Pp.L += 1; Pp.I += dert.p; Pp.D += dert.d; Pp.M += dert.m; Pp.negL+=dert.negL; Pp.negM+=dert.negM
+            Pp.dert_ += [dert]
+        x += 1
+        _sign = sign
+
+    if len(Pp_) > 4:
+        splice_P_(Pp_, fPd=0)  # merge mean_I- or mean_D- similar and weakly separated Ps
+        if len(P_) > 4:
+            intra_Ppm_(Pp_, param_name, rdn, fPd)  # evaluates for sub-recursion per Pm
+
+    return Pp_
+
+
+def compute_overlap(layer0, fPd):  # find Pps that overlap across 4 Pp_s, compute overlap ratio
+
+    overlapping_Pp_ = []
+
+    for _param_name in layer0: # loop 1st param
+        if fPd: _Pp_ = layer0[_param_name][0][1]  # _Ppd
+        else:   _Pp_ = layer0[_param_name][0][0]  # _Ppm
+
+        for _Pp in _Pp_:  # Pps of current param, _Pp of 1st param may overlap with multiple Pps of the other param
+            overlapping_Pps = [(_Pp,_param_name)]  # initialization
+
+            for param_name in layer0:
+                if (_param_name != param_name):  # check Pps of all other params
+                    if fPd: Pp_ = layer0[param_name][0][1]  # Ppd
+                    else:   Pp_ = layer0[param_name][0][0]  # Ppm
+
+                    for Pp in Pp_:  # check Pps of the other param for x overlap:
+                        if (Pp.x0 - 1 < (_Pp.x0 + _Pp.L) and (Pp.x0 + Pp.L) + 1 > _Pp.x0):
+                            overlapping_Pps.append((Pp,param_name))
+
+        if len(overlapping_Pps) > 1: # at least more than 1 Pps for a series of overlapping Pps
+            overlapping_Pp_.append(overlapping_Pps)
+
+    derPp__ = []  # from comp_Pp of all overlapping Pps
+    for overlapping_Pps in overlapping_Pp_:  # compute overlap ratio
+        derPp_ = []  # from comp_Pp of overlapping Pps from current-pair Pp_s:
+
+        for (_Pp,_param_name) in overlapping_Pps:
+            for (Pp,param_name) in overlapping_Pps:
+                if _Pp is not Pp:
+                    # https://stackoverflow.com/questions/16691524/calculating-the-overlap-distance-of-two-1d-line-segments
+                    olpL = max(0, min(_Pp.x0+_Pp.L, Pp.x0+Pp.L) - max(_Pp.x0, Pp.x0))  # L of overlap
+                    # replace with computing pixel-level x0,L
+                    rolp = olpL / ((_Pp.L + Pp.L) / 2)  # mean of overlap Ls
+
+                    if rolp > ave_rolp:
+                        derPp = comp_Pp(_Pp,Pp,layer0)
+                        derPp_.append(derPp)
+
+        if derPp_: derPp__.append(derPp_)
+
+    return derPp__
+
+
+def form_PP_(PP_, derPp__):
+    '''
+    Draft
+    form PP from derPps formed from different overlapping Pps
+    '''
+    for derPp_ in derPp__:
+        fPP = 0
+        PP = CPP() # initialize 1st PP
+
+        for derPp in derPp_:
+            if derPp.mP > -ave_M*100  and derPp.dP > -ave_D*100 :
+                fPP = 1
+                PP.accum_from(derPp)
+                PP.derPp_.append(derPp)
+
+        if fPP: PP_.append(PP)
+
+def comp_Pp(_Pp, Pp, layer0):
+    '''
+    almost same as old comp_P
+    '''
+    mPp = dPp = 0
+    layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
+    dist_coef = ave_rM * (1 + _Pp.negL / _Pp.L)  # average match projected at current distance
+
+    for param_name in layer1:
+        if param_name == "I":
+            dist_ave = ave_inv * dist_coef
+        else:
+            dist_ave = ave_min * dist_coef
+        param = getattr(_Pp, param_name)
+        _param = getattr(Pp, param_name)
+        dert = comp_param(_param, param, [], dist_ave)
+        rdn = layer0[param_name+'_'][1] # index 1 =rdn
+        mPp += dert.m * rdn
+        dPp += dert.d * rdn
+        layer1[param_name] = dert
+
+    negM = _Pp.negM - Pp.negM
+    negL = _Pp.L - Pp.negL
+    '''
+    options for div_comp, etc.    
+    if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
+    if mP > 0
+        # positive forward match, compare sublayers between P.sub_H and _P.sub_H:
+       comp_sublayers(_P, P, mP)
+    if isinstance(_P.derP, CderP):  # derP is created in comp_sublayers
+        _P.derP.sign = sign
+        _P.derP.layer1 = layer1
+        _P.derP.accumulate(mP=mP, neg_M=neg_M, neg_L=neg_L, P=_P)
+        derP = _P.derP
+    else:
+        derP = CderP(sign=sign, mP=mP, neg_M=neg_M, neg_L=neg_L, P=_P, layer1=layer1)
+        _P.derP = derP
+    '''
+    derPp = CderPp( mPp=mPp, dPp=dPp, negM=negM, negL=negL, _Pp=_Pp, Pp=Pp, layer1=layer1)
+
+    return derPp
+
+# below is not revised
 
 def sub_search_recursive(P_, fderP):  # search in top sublayer per P / sub_P
 
@@ -145,92 +273,6 @@ def sub_search_recursive(P_, fderP):  # search in top sublayer per P / sub_P
                     sub_PPm_, sub_PPd_ = search(sub_P_)
                     sublayer[6].append(sub_PPm_); sublayer[7].append(sub_PPd_)
                     sub_search_recursive(sub_P_, fderP=1)  # deeper sublayers search is selective per sub_P
-
-
-def merge_comp_P(P_, _P, P, i, j, neg_M, neg_L, remove_index):  # multi-variate cross-comp, _smP = 0 in line_patterns
-
-    mP = dP = 0
-    layer1 = dict({'L': .0, 'I': .0, 'D': .0, 'M': .0})
-    dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance from P: neg_L, separate for min_match, add coef / var?
-
-    for param_name in layer1:
-        if param_name == "I":
-            dist_ave = ave_inv * dist_coef
-        else: dist_ave = ave_min * dist_coef
-        param = getattr(_P, param_name) / _P.L  # swap _ convention here, it's different in search
-        _param = getattr(P, param_name) / P.L
-        dm = comp_param(_param, param, [], dist_ave)
-        rdn = layer0_rdn[param_name]
-        mP += dm.m*rdn
-        dP += dm.d*rdn
-        layer1[param_name] = dm
-
-    if neg_L == 0:
-        mP += _P.m_[0]; dP += _P.d_[0]
-
-    rel_distance = neg_L / _P.L
-
-    if mP / max(rel_distance, 1) > ave_merge:  # merge(_P, P): splice proximate and param/L- similar Ps:
-        _P.accum_from(P)
-        _P.d_[0]+= P.d_[0];
-        _P.p_[0]+= P.p_[0];
-        _P.m_[0]+= P.m_[0];
-        remove_index.append(j)
-        if _P.fPd: _P.sign = P.D > 0
-        else: P.sign = P.M > 0
-
-        if (i-1) >=0 and (i-1) not in remove_index and (i) not in remove_index:
-            derP, _L, _smP = merge_comp_P(P_, P_[i-1], _P, i-1, i, neg_M, neg_L, remove_index)  # backward re-comp_P
-
-        elif (j+1) <= len(P_)-1 and (j+1) not in remove_index and (i) not in remove_index:
-            derP, _L, _smP = merge_comp_P(P_, _P, P_[j+1], i, j+1, neg_M, neg_L, remove_index)  # forward comp_P
-        else:
-            derP = None
-
-    else:  # form derP:
-        derP, L, _smP = comp_P(_P, P, neg_L, neg_M)
-
-    return derP, _P.L, _P.sign
-
-
-def comp_P(_P, P, neg_L, neg_M):  # multi-variate cross-comp, _smP = 0 in line_patterns
-
-    mP = dP = 0
-    layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
-    dist_coef = ave_rM ** (1 + neg_L / _P.L)  # average match projected at current distance:
-
-    for param_name in layer1:
-        if param_name == "I":
-            dist_ave = ave_inv * dist_coef
-        else:
-            dist_ave = ave_min * dist_coef
-        param = getattr(_P, param_name)
-        _param = getattr(P, param_name)
-        dm = comp_param(_param, param, [], dist_ave)
-        rdn = layer0_rdn[param_name]
-        mP += dm.m * rdn
-        dP += dm.d * rdn
-        layer1[param_name] = dm
-        '''
-        main comp is between summed params, with an option for div_comp, etc.
-        mP -= ave_M * ave_rM ** (1 + neg_L / P.L)  # average match projected at current distance: neg_L, add coef / var?
-        match(P,_P), ave_M is addition to ave? or abs for projection in search?
-        '''
-        if P.sign == _P.sign: mP *= 2  # sign is MSB, value of sign match = full magnitude match?
-        sign = mP > 0
-        if sign:  # positive forward match, compare sublayers between P.sub_H and _P.sub_H:
-            comp_sublayers(_P, P, mP)
-
-        if isinstance(_P.derP, CderP):  # derP is created in comp_sublayers
-            _P.derP.sign = sign
-            _P.derP.layer1 = layer1
-            _P.derP.accumulate(mP=mP, neg_M=neg_M, neg_L=neg_L, P=_P)
-            derP = _P.derP
-        else:
-            derP = CderP(sign=sign, mP=mP, neg_M=neg_M, neg_L=neg_L, P=_P, layer1=layer1)
-            _P.derP = derP
-
-    return derP, _P.L, _P.sign
 
 
 def comp_sublayers(_P, P, mP):  # also add dP?
@@ -338,7 +380,6 @@ def div_comp_P(PP_):  # draft, check all PPs for x-param comp by division betwee
                 '''
     return PP_
 
-
 def form_adjacent_mP(derP_d_):
 
     pri_mP = derP_d_[0].mP
@@ -353,203 +394,18 @@ def form_adjacent_mP(derP_d_):
 
     return derP_d_
 
-
-def intra_PPm_(PPm_, rdn):
+def intra_Ppm_(Pp_, param_name, rdn, fPd):
     '''
-    Each PP is evaluated for intra-processing, non-recursive here:
-    - incremental range and derivation, as in line_patterns intra_P but over multiple params,
+    Draft
+    Each Pp is evaluated for sub-recursion: incremental range and derivation, as in line_patterns but via adjusted ave_M,
     - x param div_comp: if internal compression: rm * D * L, * external compression: PP.L * L-proportional coef?
     - form_par_P if param Match | x_param Contrast: diff (D_param, ave_D_alt_params: co-derived co-vary? neg val per P, else delete?
     form_PPd: dP = dL + dM + dD  # -> directional PPd, equal-weight params, no rdn?
     if comp I -> dI ~ combined d_derivatives, then project ave_d?
     '''
+    for Pp in Pp_:
+        if Pp.M > ave_M and Pp.M / Pp.L > ave:
 
-    for PP in PPm_:
-        if len(PP.P_) > 8 and PP.mP + PP.M > ave_PPM:
-            # calls rnd_derP:
-            sub_PPm_ = rng_search(PP.P_, (ave_M + PP.M / len(PP.P_)) / 2 * rdn)  # ave_M is average of local and global match
-
-            return sub_PPm_
-
-
-def rng_search(P_, ave):
-    comb_layers = []  # if recursive only
-    sub_PPm_ = []
-    rderP_ = []
-
-    for i, P in enumerate(P_):
-        neg_M = vmP = sign = _smP = neg_L = 0
-
-        for j, _P in enumerate(P_[i + 2:]):  # i+2: skip previously compared adjacent Ps, i+3 for sparse comp?
-            # variable-range comp, no last-P displacement, just shifting first _P
-            if P.M * (neg_L/P.L * ave_rM) + neg_M > ave:  # search while net_M > ave
-
-                rderP, _L, _smP = comp_P(P, _P, neg_M, neg_L)
-                sign, vmP, neg_M, neg_L, P = rderP.sign, rderP.mP, rderP.neg_M, rderP.neg_L, rderP.P
-                if sign:
-                    P_[i + 1 + j]._smP = True  # backward match per compared _P
-                    rderP_.append(rderP)
-                    break  # nearest-neighbour search is terminated by first match
-                else:
-                    neg_M += vmP  # accumulate contiguous miss: negative mP
-                    neg_L += _L   # accumulate distance to match
-                    if j == len(P_):
-                        # last P is a singleton derP, derivatives are ignored:
-                        rderP_.append(CderP(sign=sign or _smP, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P ))
-            else:
-                rderP_.append(CderP(sign=sign or _smP, mP=vmP, neg_M=neg_M, neg_L=neg_L, P=P))
-                # sign is ORed bilaterally, negative for singleton derPs only
-                break  # neg net_M: stop search
-
-        sub_PPm_ = form_PP_(rderP_, fPd=False)  # cluster derPs into PPms by the sign of mP, same form_PPm_?
-
-    return sub_PPm_
-
-
-def merge_Pp(derP_,fPd=None): # Remove low value Pps and merge into negative Pp
-    neg_Pp_ = []
-    remove_index = []
-    for i,derP in enumerate(derP_):  # interae ove PPm_ in search of strong Ps
-        if derP.layer1:  # how can layer1 be empty?
-            for param_name in derP.layer1
-                if fPd: Pp_ = derP.layer1[param_name].Ppm_
-                else: Pp_ = derP.layer1[param_name].Ppd_
-
-                for j,Pp in enumerate(Pp_):
-                    if fPd: Pparam = Pp.M 
-                    else: Pparam = Pp.D
-                    if abs(Pparam) < ave: # get low value negative Pps
-                        neg_Pp_.append(Pp)
-                        remove_index.append(j) 
-                if neg_Pp_:
-                    _neg_Pp = neg_Pp_[0]
-                    for i,neg_Pp in enumerate(neg_Pp_,start=1):
-                        _neg_Pp.accum_from(neg_Pp) #accumulate all neg_Pps 
-                    if fPd: derP.layer1[param_name].Ppm_[0] = __neg_Pp #replace first Pp in Pp_ with accumulated neg_Pp
-                    else: derP.layer1[param_name].Ppd_[0] = _neg_Pp
-                    _neg_Pp = None
-
-                for index in sorted(remove_index, reverse=True):    # remove all merged Ppd from original Pp_
-                    if fpd: del derP.layer1[param_name].Ppm_[index]
-                    else: del derP.layer1[param_name].Ppd_[index]
-                remove_index = []
-                
-
-
-def form_Pp_(derP_, fPd):  # this is a draft, please check
-
-    # rdn = layer0_rdn[param_name]
-    param_names = derP_[0].layer1.key  #?
-
-    for param_name in param_names:
-        if fPd:
-            derP_[0].layer1.Ppd_[0] = CP(sign = derP_[0].layer1[param_name].d > 0)  # not sure this is correct?
-        else:
-            derP_[0].layer1.Ppm_[0] = CP(sign = derP_[0].layer1[param_name].m > 0)
-
-    for derP in derP_:
-        for param_name in param_names:  # this is not correct, we two loops
-            if fPd:
-                _sign = derP_[0].layer1.param_name.Ppd_[0].sign
-                sign = derP.layer1[param_name].d > 0
-            else:
-                _sign = derP_[0].layer1.param_name.Ppm_[0].sign
-                sign = derP.layer1[param_name].m > 0
-
-            for derP in derP_[1:]:
-                d = derP.layer1[param_name].d
-                m = derP.layer1[param_name].m
-                if fPd: sign = d > 0
-                else:   sign = m > 0
-
-            if sign != _sign:
-                if fPd: derP.layer1[param_name].Ppd_.append(Pp)
-                else:   derP.layer1[param_name].Ppm_.append(Pp)
-                Pp = CP(sign=_sign)
-            else:
-                # accumulate Pp params
-                Pp.L += 1
-                Pp.D += d
-                Pp.M += m
-                Pp.d_.append(d)
-                Pp.m_.append(m)
-
-    merge_Pp_Kelvin(derP_, fPd)
-
-def merge_Pp_Kelvin(derP_, fPd):  # merge low value Pps into negative Pp
-    neg_Pp_ = []
-    remove_index = []
-
-    for i, derP in enumerate(derP_):
-        for param_name in derP.layer1:
-                if fPd: Pp_ = derP.layer1[param_name].Ppm_
-                else:   Pp_ = derP.layer1[param_name].Ppd_
-
-                for j, Pp in enumerate(Pp_):
-                    if fPd: Pparam = Pp.M
-                    else:   Pparam = Pp.D
-                    if abs(Pparam) < ave:  # get low value negative Pps
-                        neg_Pp_.append(Pp)
-                        remove_index.append(j)
-                if neg_Pp_:
-                    _neg_Pp = neg_Pp_[0]
-                    for i, neg_Pp in enumerate(neg_Pp_, start=1):
-                        _neg_Pp.accum_from(neg_Pp)  # accumulate all neg_Pps
-                    if fPd:
-                        derP.layer1[param_name].Ppm_[0] = _neg_Pp  # replace first Pp in Pp_ with accumulated neg_Pp
-                    else:
-                        derP.layer1[param_name].Ppd_[0] = _neg_Pp
-                    _neg_Pp = None
-
-                for index in sorted(remove_index, reverse=True):  # remove all merged Ppd from original Pp_
-                    if fPd:
-                        del derP.layer1[param_name].Ppm_[index]
-                    else:
-                        del derP.layer1[param_name].Ppd_[index]
-                remove_index = []
-
-
-def eval_params(PPm_):
-
-    for PP in PPm_:
-        if PP.layer1:  # how can layer1 be empty?
-            for param_name in PP.layer1:
-
-                M = PP.layer1[param_name].m - ave_M
-                D = PP.layer1[param_name].d - ave_D
-                if M > 0 or D > 0:
-                    if M > D: D -= ave_D
-                    else: M -= ave_M  # filter*2 if redundant
-                    if M > ave_M: form_Pp_(PP, param_name, fPd = False)
-                    if D > ave_D: form_Pp_(PP, param_name, fPd = True)
-
-'''
-if i < _P.derP.ileft: _P.derP.ileft = i  # index of leftmost P that _P was compared to, for back_search_extend()
-PPm_ = back_search_extend( PPm_, P_)  # evaluate for 1st P in each PP, merge with _P.derP.PP if any
-def back_search_extend( PPm_, P_):  # each P should form derP, evaluate for the 1st P in PP, merge with _P.PP if any
-    # search by PP.derP.P_[0] over P_, starting from illeft, as in forward search() but with decreasing indices.
-    for PP in PPm_:
-        neg_M = neg_L = mP = sign = _sign = 0
-        derP = PP.derP_[0]
-        illeft = derP.ileft - 1
-        while illeft > 0:
-            _P = P_[illeft]
-            while (derP.P.M + neg_M > 0):
-                _derP, _L, _sign = comp_P(derP.P, P_[illeft], neg_M, neg_L)
-                if _sign:  # last mP sign is positive: P_[illeft] has PP
-                    # merge derP into _P.derP:
-                    _P.derP.neg_M += derP.neg_M; _P.derP.neg_L += derP.neg_L  # accumulated derivatives
-                    _P.derP.mP = derP.mP; _P.derP.dP = derP.dP  # derivatives between newly adjacent Ps in PP:
-                    _derP.PP.layer1 = _derP.layer1
-                    # merge derP.PP into _derP.PP:
-                    _derP.PP.accum_from(PP)
-                    for i, dm in enumerate(PP.layer1):  # accumulate layer1
-                        _derP.PP.layer1[i] += dm
-                    PPm_.remove(PP)
-                    break  # nearest-neighbour search is terminated by first match
-                else:
-                    _derP.neg_M += _derP.mP  # accumulate contiguous P miss, or all derP vars?
-                    _derP.neg_L += _L   # accumulate distance to match
-                    illeft -= 1
-            break  # search ends without a match, no change in derP and PP.
-'''
+            Pp.sub_layers = search_param_(param_name, ((Pp.dert_, Pp.L, Pp.x0), rdn) )  # iparam = (param_, P.L, P.x0), rdn
+            # add: ave_M + (Pp.M / len(Pp.P_)) / 2 * rdn: ave_M is average of local and global match
+            # extended search needs to be restricted to ave_M-terminated derts

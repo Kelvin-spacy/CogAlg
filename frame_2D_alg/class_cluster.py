@@ -275,7 +275,6 @@ class ClusterStructure(metaclass=MetaCluster):
             if (param not in excluded) and (param in other.numeric_params):
                 p = getattr(self,param)
                 _p = getattr(other,param)
-
                 setattr(self, param, p+_p)
 
         # accumulate layers 1 and above
@@ -288,11 +287,12 @@ class ClusterStructure(metaclass=MetaCluster):
                 if len(layer) == len(_layer): # both layers are having same params
                     for i, ((param_name,dert), (_param_name,_dert)) in enumerate(zip(layer.items(), _layer.items())):  # accumulate _dert to dert in layer
 
-                        if not isinstance(dert, Cdert) and isinstance(_dert, Cdert): # dert is not dert, due to base param < ave_comp
+                        if not isinstance(dert, Cdert) and isinstance(_dert, Cdert):  # dert is not dert if base param < ave_comp?
                             layer[param_name] = _dert
-                        elif isinstance(dert, Cdert) and isinstance(_dert, Cdert): # both params are having dm
-                            if param_name in ['Da','Dady','Dadx'] and _param_name in ['Da','Dady','Dadx'] : # check both names, just in case
-                                # convert da to vector, sum them and convert them back to angle
+                        elif isinstance(dert, Cdert) and isinstance(_dert, Cdert):  # both params have dm
+                            if param_name in ['Da','Dady','Dadx'] and _param_name in ['Da','Dady','Dadx']:  # we shouldn't need both
+                                ''' 
+                                we shouldn't have da, daa, only ma, maa?
                                 da = dert.d; _da= _dert.d
                                 sin = np.sin(da); _sin = np.sin(_da)
                                 cos = np.cos(da); _cos = np.cos(_da)
@@ -300,6 +300,8 @@ class ClusterStructure(metaclass=MetaCluster):
                                 cos_sum= (cos * _cos) - (sin * _sin)   # cos(α + β) = cos α cos β - sin α sin β
                                 a_sum = np.arctan2(sin_sum, cos_sum)
                                 layer[param_name].d = a_sum
+                                '''
+                                pass
                             else:
                                 dert.d += _dert.d
 
@@ -312,7 +314,6 @@ class ClusterStructure(metaclass=MetaCluster):
 class Cdert(Number): # Ppd and Ppdm might not relevant now, so remove it
     __slots__ = ('i','p','d','m')
 
-
     def __init__(self, i=0, p=0, d=0, m=0):
         self.i, self.p, self.d, self.m = i, d, m, p
 
@@ -323,25 +324,21 @@ class Cdert(Number): # Ppd and Ppdm might not relevant now, so remove it
         if isinstance(self.i, Cdert) or isinstance(self.p, Cdert) or isinstance(self.d, Cdert) or isinstance(self.m, Cdert):
             return "Cdert(i=Cdert, p=Cdert, d=Cdert, m=Cdert)"
         else:
-
             return "Cdert(i={}, p={}, d={}, m={})".format(self.i, self.p, self.d, self.m, self.p)
 
 
 def comp_param(param, _param, param_name, ave):
 
-    if isinstance(param,list): # vector
+    if isinstance(param,list):  # vector
         sin, cos = param[0], param[1]
         _sin, _cos = _param[0], _param[1]
         # difference of dy and dx
         sin_da = (cos * _sin) - (sin * _cos)  # sin(α - β) = sin α cos β - cos α sin β
         cos_da= (cos * _cos) + (sin * _sin)   # cos(α - β) = cos α cos β + sin α sin β
-        # da and ma
         da = np.arctan2(sin_da, cos_da)
-        mda = ave - abs(da)
-        # compute dm
-        dert = Cdert(i=param, p=param+_param, d=da, m=mda)   # please check if correct
-    else: # numeric
-
+        ma = ave - abs(da)  # indirect match
+        dert = Cdert(i=param, p=param+_param, d=da, m=ma)  # d=None? p=param+_param will sum lists?
+    else:  # numeric
         d = param - _param    # difference
         if param_name == 'I':
             m = ave - abs(d)  # indirect match
