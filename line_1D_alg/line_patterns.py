@@ -37,8 +37,6 @@ class Cdert(ClusterStructure):
     m = int  # distinct in deriv_comp only
 
 class CP(ClusterStructure):
-
-    sign = bool  # replace by if P.M > 0
     L = int
     I = int
     D = int
@@ -47,19 +45,17 @@ class CP(ClusterStructure):
     dert_ = list  # contains (i, p, d, m)
     sublayers = list  # multiple layers of sub_P_s from d segmentation or extended comp, nested to depth = sub_[n]
     # for layer-parallel access and comp, ~ frequency domain, composition: 1st: dert_, 2nd: sub_P_[ derts], 3rd: sublayers[ sub_Ps[ derts]]
-    # for line_PPs
-    derP = object  # forward comp_P derivatives
     fPd = bool  # P is Pd if true, else Pm; also defined per layer
 
+verbose = False
 # pattern filters or hyper-parameters: eventually from higher-level feedback, initialized here as constants:
-
 ave = 15  # |difference| between pixels that coincides with average value of Pm
 ave_min = 2  # for m defined as min |d|: smaller?
 ave_M = 50  # min M for initial incremental-range comparison(t_), higher cost than der_comp?
 ave_D = 5  # min |D| for initial incremental-derivation comparison(d_)
 ave_nP = 5  # average number of sub_Ps in P, to estimate intra-costs? ave_rdn_inc = 1 + 1 / ave_nP # 1.2
 ave_rdm = .5  # obsolete: average dm / m, to project bi_m = m * 1.5
-ave_merge = 50  # to merge a kernel of 3 adjacent Ps
+ave_splice = 50  # to merge a kernel of 3 adjacent Ps
 init_y = 0  # starting row, the whole frame doesn't need to be processed
 
 '''
@@ -89,9 +85,9 @@ def cross_comp(frame_of_pixels_):  # converts frame_of_pixels to frame_of_patter
         _i = pixel_[0]
         # pixel i is compared to prior pixel _i in a row:
         for i in pixel_[1:]:
-            d = i -_i
-            p = i +_i
-            m = ave - abs(d)  # for consistency with deriv_comp output, otherwise redundant
+            d = i -_i  # accum in rng
+            p = i +_i  # accum in rng
+            m = ave - abs(d)  # accum in rng, for consistency with deriv_comp output, else redundant
             dert_.append( Cdert(i=i,p=p,d=d,m=m) )
             _i = i
         # form m Patterns, evaluate intra_Pm_ per Pm:
@@ -113,7 +109,7 @@ def form_P_(dert_, rdn, rng, fPd):  # accumulation and termination
         else:   sign = dert.m > 0
         if sign != _sign:
             # sign change, initialize and append P
-            P = CP(sign=_sign, L=1, I=dert.p, D=dert.d, M=dert.m, x0=x, dert_=[dert], sublayers=[], fPd=fPd)
+            P = CP(L=1, I=dert.p, D=dert.d, M=dert.m, x0=x, dert_=[dert], sublayers=[], fPd=fPd)
             P_.append(P)  # still updated with accumulation below
         else:
             # accumulate params:
@@ -121,22 +117,21 @@ def form_P_(dert_, rdn, rng, fPd):  # accumulation and termination
             P.dert_ += [dert]
         x += 1
         _sign = sign
-    
+
     if len(P_) > 4:
-        #P_ = splice_P_(P_, fPd=0)  # merge meanI- or meanD- similar and weakly separated Ps
-        #if len(P_) > 4:
+        P_ = splice_P_(P_, fPd=0)  # merge meanI- or meanD- similar and weakly separated Ps; move to comp_param instead?
         intra_Pm_(P_, rdn, rng, not fPd)  # evaluates range_comp | deriv_comp sub-recursion per Pm
-    '''
+
     with open("frame_of_patterns_2.csv", "a") as csvFile:  # current layer visualization
         write = csv.writer(csvFile, delimiter=",")
         for item in range(len(P_)):
             # print(P_[item].L, P_[item].I, P_[item].D, P_[item].M, P_[item].x0)
             write.writerow([P_[item].L, P_[item].I, P_[item].D, P_[item].M, P_[item].x0])
-    '''
+
     return P_
 
 ''' 
-Sub-recursion in intra_P extends pattern with sub_: hierarchy of sub-patterns, to be adjusted by macro-feedback:
+Sub-recursion in intra_P extends pattern with a hierarchy of sub-patterns (sub_), to be adjusted by feedback:
 '''
 def intra_Pm_(P_, rdn, rng, fPd):  # evaluate for sub-recursion in line Pm_, pack results into sub_Pm_
 
@@ -155,7 +150,7 @@ def intra_Pm_(P_, rdn, rng, fPd):  # evaluate for sub-recursion in line Pm_, pac
                     loc_ave_min = (ave_min + P_ave) / 2
                     rdert_ = range_comp(P.dert_, loc_ave, loc_ave_min, fid)
                     '''
-                    rdert_ = range_comp(P.dert_)  # rng+ comp with localized ave, skip predictable next dert
+                    rdert_ = range_comp(P.dert_)  # rng+ comp, skip predictable next dert, localized ave?
                     rdn += 1; rng += 1
                     sub_Pm_ = form_P_(rdert_, rdn, rng, fPd=False)  # cluster by m sign, eval intra_Pm_
                     Ls = len(sub_Pm_)
@@ -238,12 +233,12 @@ def range_comp(dert_):  # cross-comp of 2**rng- distant pixels: 4,8,16.., skippi
     rdert_ = []
     _i = dert_[0].i
 
-    for dert in dert_[2::2]:  # all inputs are sparse, skip odd pixels compared in prior rng: 1 skip / 1 add, to maintain 2x overlap
+    for dert in dert_[2::2]:  # all inputs are sparse, skip odd pixels compared in prior rng: 1 skip / 1 add to maintain 2x overlap
         d = dert.i -_i
         rp = dert.p + _i  # intensity accumulated in rng
         rd = dert.d + d   # difference accumulated in rng
         rm = dert.m + ave - abs(d)  # m accumulated in rng
-        # for consistency with deriv_comp, else m is redundant
+        # for consistency with deriv_comp, else redundant
         rdert_.append( Cdert( i=dert.i,p=rp,d=rd,m=rm ))
         _i = dert.i
 
@@ -268,79 +263,75 @@ def deriv_comp(dert_):  # cross-comp consecutive ds in same-sign dert_: sign mat
 
 def splice_P_(P_, fPd):
     '''
-    Initial P separation is determined by pixel-level sign change, but resulting opposite-sign pattern may be relatively weak,
-    and same-sign patterns it separates relatively strong.
-    Another criterion to re-evaluate separation is similarity of defining param: M/L for Pm, D/L for Pd, among the three Ps
-    If relative proximity * relative similarity > merge_ave: all three Ps should be merged into one.
+    Initial P termination is by pixel-level sign change, but resulting separation may be insignificant on a pattern level.
+    That is, separating opposite-sign pattern is weak relative to separated same-sign patterns.
+    The criterion to re-evaluate separation is similarity of P-defining param: M/L for Pm, D/L for Pd, among the three Ps
+    If relative similarity > merge_ave: all three Ps are merged into one.
     '''
-    new_P_ = []
-    while len(P_) > 2:  # at least 3 Ps
-        __P = P_.pop(0)
-        _P = P_.pop(0)
-        P = P_.pop(0)
+    splice_val_ = [splice_eval(__P, _P, P, fPd)  # compute splice values
+                   for __P, _P, P in zip(P_, P_[1:], P_[2:])]
+    sorted_splice_val_ = sorted(enumerate(splice_val_),
+                                key=lambda k: k[1],
+                                reverse=True)   # sort index by splice_val_
+    if sorted_splice_val_[0][1] <= ave_splice:  # exit recursion
+        return P_
 
-        if splice_eval(__P, _P, P, fPd) > ave_merge:  # no * ave_rM * (1 + _P.L / (__P.L+P.L) / 2): _P.L is not significant
-            # for debugging
-            #print('P_'+str(_P.id)+' and P_'+str(P.id)+' are merged into P_'+str(__P.id))
-            # merge _P and P into __P
-            for merge_P in [_P, P]:
-                __P.x0 = min(__P.x0, merge_P.x0)
-                __P.accum_from(merge_P)
-                __P.dert_+= merge_P.dert_
-            # back splicing
-            __P = splice_P_back(new_P_, __P, fPd)
-            P_.insert(0, __P)  # insert merged __P back into P_ to continue merging
-        else:
-            new_P_.append(__P) # append __P to P_ when there is no further merging process for __P
-            P_.insert(0, P)    # insert P back into P_ for the consecutive merging process
-            P_.insert(0, _P)  # insert _P back into P_ for the consecutive merging process
-
-    # pack remaining Ps:
-    if P_: new_P_ += P_
-    return new_P_
-
-def splice_P_back(new_P_, P, fPd):  # P is __P in calling splice_P_
-
-    while len(new_P_) > 2:  # at least 3 Ps
-        _P = new_P_.pop()
-        __P = new_P_.pop()
-
-        if splice_eval(__P, _P, P, fPd) > ave_merge:  # no * ave_rM * (1 + _P.L / (__P.L+P.L) / 2):
-            # match projected at distance between P,__P: rM is insignificant
-            # for debug purpose
-            #print('P_'+str(_P.id)+' and P_'+str(P.id)+' are backward merged into P_'+str(__P.id))
-            # merge _P and P into __P
-            for merge_P in [_P, P]:
-                __P.x0 = min(__P.x0, merge_P.x0)
-                __P.accum_from(merge_P)
-                __P.dert_+= merge_P.dert_
-            P = __P  # also returned
-        else:
-            new_P_+= [__P, _P]
+    folp_ = np.zeros(len(P_), bool)  # if True: P is included in another spliced triplet
+    spliced_P_ = []
+    for i, splice_val in sorted_splice_val_:  # loop through splice vals
+        if splice_val <= ave_splice:  # stop, following splice_vals will be even smaller
             break
+        if folp_[i : i+3].any():  # skip if overlap
+            continue
+        folp_[i : i+3] = True     # splice_val > ave_splice: overlapping Ps folp=True
+        __P, _P, P = P_[i : i+3]  # triplet to splice
+        # merge _P and P into __P:
+        __P.accum_from(_P, excluded=['x0', 'ix0'])
+        __P.accum_from(P, excluded=['x0', 'ix0'])
 
-    return P
+        if hasattr(__P, 'pdert_'):  # for splice_Pp_ in line_PPs
+            __P.pdert_ += _P.pdert_ + P.pdert_
+        else:
+            __P.dert_ += _P.dert_ + P.dert_
+        spliced_P_.append(__P)
+
+    # add remaining Ps into spliced_P
+    spliced_P_ += [P_[i] for i, folp in enumerate(folp_) if not folp]
+    spliced_P_.sort(key=lambda P: P.x0)  # back to original sequence
+
+    if len(spliced_P_) > 4:
+        splice_P_(spliced_P_, fPd)
+
+    return spliced_P_
+
 
 def splice_eval(__P, _P, P, fPd):  # should work for splicing Pps too
     '''
-    For 3 Pms, same-sign P1 and P3, and opposite-sign P2:
-    relative proximity = abs((M1+M3) / M2)
+    For 3 Pms, same-sign P1, P3, opposite-sign P2:
+    relative continuity vs separation = abs(( M2/ ( M1+M3 )))
     relative similarity = match (M1/L1, M3/L3) / miss (match (M1/L1, M2/L2) + match (M3/L3, M2/L2)) # both should be negative
+    or P2 is reinforced as contrast - weakened as distant -> same value, not merged?
+    splice P1, P3: by proj mean comp, ~ comp_param, ave / contrast P2
+    re-run intra_P in line_PPs Pps?
+    also distance / meanL, if 0: fractional distance = meanL / olp? reduces ave, not m?
     '''
     if fPd:
-        proximity = abs((__P.D + P.D) / _P.D) if _P.D != 0 else 0  # prevents /0
-        __mean=__P.D/__P.L; _mean=_P.D/_P.L; mean=P.D/P.L
+        if _P.D==0: _P.D =.1  # prevents /0
+        rel_continuity = abs((__P.D + P.D) / _P.D)
+        __mean= __P.D/__P.L; _mean= _P.D/_P.L; mean= P.D/P.L
     else:
-        proximity = abs((__P.M + P.M) / _P.M) if _P.M != 0 else 0  # prevents /0
-        __mean=__P.M/__P.L; _mean=_P.M/_P.L; mean=P.M/P.L
-    m13 = min(mean, __mean) - abs(mean-__mean)/2   # P1 & P3
-    m12 = min(_mean, __mean) - abs(_mean-__mean)/2 # P1 & P2
-    m23 = min(_mean, mean) - abs(_mean- mean)/2    # P2 & P3
+        if _P.M == 0: _P.M =.1  # prevents /0
+        rel_continuity = abs((__P.M + P.M) / _P.M)
+        __mean= __P.M/__P.L; _mean= _P.M/_P.L; mean= P.M/P.L
 
-    similarity = m13 / abs( m12 + m23)  # both should be negative
-    merge_value = proximity * similarity
+    m13 = min(mean, __mean) - abs(mean-__mean)/2    # inverse match of P1, P3
+    m12 = min(_mean, __mean) - abs(_mean-__mean)/2  # inverse match of P1, P2, should be negative
+    m23 = min(_mean, mean) - abs(_mean- mean)/2     # inverse match of P2, P3, should be negative
 
-    return merge_value
+    rel_similarity = (m13 * rel_continuity) / abs(m12 + m23)  # * rel_continuity: relative value of m13 vs m12 and m23
+    # splice_value = rel_continuity * rel_similarity
+
+    return rel_similarity
 
 if __name__ == "__main__":
     ''' 
@@ -356,9 +347,8 @@ if __name__ == "__main__":
     assert image is not None, "No image in the path"
     render = 0
     verbose = 0
-
     if render:
-        plt.figure();plt.imshow(image, cmap='gray')  # show the image below in gray
+        plt.figure();plt.imshow(image, cmap='gray')  # show the image in gray
 
     # for visualization:
     with open("frame_of_patterns_2.csv", "w") as csvFile:
@@ -371,6 +361,15 @@ if __name__ == "__main__":
     frame_of_patterns_ = cross_comp(image)  # returns Pm__
     # from pprint import pprint
     # pprint(frame_of_patterns_[0])  # shows 1st layer Pm_ only
+    if render:
+        # Khanh's visualization
+        img = np.full((image.shape[0] - 1, image.shape[1] - 1), 128, np.uint8)  # dert size is smaller by the size of 1
+        for y, P_ in enumerate(frame_of_patterns_):
+            for P in P_:
+                wd = img[y, P.x0:P.x0 + P.L]
+                wd[:] = (P.M > 0) * 255
+        plt.figure(); plt.imshow(img, cmap='gray'); plt.title('merged image')
+        # cv2.imwrite("img_merged.bmp",img)
 
     fline_PPs = 0
     if fline_PPs:  # debug line_PPs_draft
