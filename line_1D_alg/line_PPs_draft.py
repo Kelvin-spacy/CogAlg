@@ -44,8 +44,11 @@ class CderPp(ClusterStructure):
     der_sub_H = list  # sub hierarchy of derivatives, from comp sublayers
 
 class CPP(CPp):
+    mPp = int # for derPp accumulation
+    dPp = int
     layer1 = dict
-    derPp_ = list
+    derPp____ = list  # _names ( _Pp_ ( names ( Pp_ )))
+    param_name_= list # for visualization purpose
 
 
 ave = 100  # ave dI -> mI, * coef / var type
@@ -63,11 +66,12 @@ ave_inv = 20 # ave inverse m, change to Ave from the root intra_blob?
 ave_min = 5  # ave direct m, change to Ave_min from the root intra_blob?
 ave_rolp = .5  # ave overlap ratio for comp_Pp
 
+# for debug purpose, draw each PP's Pp
+
 
 def search(P_):  # cross-compare patterns within horizontal line
-
     # sub_search_recursive(P_, fderP=0)  # search with incremental distance: first inside sublayers
-    PP_ = []
+
     layer0 = {'L_': [[],.25], 'I_': [[],.5], 'D_': [[],.25], 'M_': [[],.5]}  # M is doubled because it represents both comparands
     if len(P_) > 1:
         # at least 2 comparands, unpack P_:
@@ -80,9 +84,11 @@ def search(P_):  # cross-compare patterns within horizontal line
         for param_name in layer0:  # loop L_, I_, D_, M_
             search_param_(param_name, layer0[param_name])  # layer0[param_name][0].append((Ppm_, Ppd_))
 
-        PP_ = comp_overlaps(layer0, fPd=0)  # calls comp_Pp_ and form_PP_ for overlapping derPp___s
+        PPm_ = comp_overlaps(layer0, fPd=0)  # calls comp_Pp_ and form_PP_ for overlapping derPp___s
+        PPd_ = comp_overlaps(layer0, fPd=1)  # calls comp_Pp_ and form_PP_ for overlapping derPp___s
 
-    return PP_
+        return (PPm_, PPd_)
+
 
 def search_param_(param_name, iparam):
 
@@ -94,10 +100,10 @@ def search_param_(param_name, iparam):
     for i, (param, L, x0) in enumerate(param_[1:], start=1):
         # param is compared to prior-P param:
         dert = comp_param(_param, param, param_name, ave/rdn)
-        # or div_comp(L), norm_comp(I, D, M) -> splice or higher composition?
-        # negL, negM stay 0:
+        # or div_comp(L), norm_comp(I, D, M): value conserve, mean doesn't?
+        # -> splice or higher composition: preserve inputs?
         ddert_.append( Cpdert( i=dert.i, p=dert.p, d=dert.d, m=dert.m, x0=x0, L=L) )
-        negL=negM=0
+        negL=negM=0  # comp next only
         comb_M = dert.m
         j = i
         while comb_M > 0 and j+1 < len(param_):
@@ -149,9 +155,9 @@ def form_Pp_(dert_, param_name, rdn, fPd):  # almost the same as line_patterns f
 
 
 def comp_overlaps(layer0, fPd):  # find Pps that overlap across 4 Pp_s, compute overlap ratio, call comp_Pp_ and form_PP_
-    PP_ = []
+
+    # diagram on nesting layers: https://user-images.githubusercontent.com/52521979/127081051-9b28dd36-e2f8-4d25-9b10-276de669ccbe.png
     derPp____ = []  # from comp_Pp across all params
-    # it seems there are 4 layers of nesting, not 3?
 
     for i, _param_name in enumerate(layer0): # loop 1st param
         if fPd: _Pp_ = layer0[_param_name][0][1]  # _Ppd
@@ -160,14 +166,14 @@ def comp_overlaps(layer0, fPd):  # find Pps that overlap across 4 Pp_s, compute 
         derPp___ = []  # from comp_Pp of current param' overlapping Pps
 
         for _Pp in _Pp_:  # Pps of current param, _Pp of 1st param may overlap with multiple Pps of the other param
+            # no indexing, olp is determined by P index, same as k in Pp_
             derPp__ = []  # from comp_Pp of _Pp to other params
 
             for j, param_name in enumerate(layer0):
-                if i>j:  # Pp pair is unique: https://stackoverflow.com/questions/16691524/calculating-the-overlap-distance-of-two-1d-line-segments
+                derPp_ = []  # from comp_Pp of _Pp to overlapping Pps per param
+                if i<j:  # Pp pair is unique: https://stackoverflow.com/questions/16691524/calculating-the-overlap-distance-of-two-1d-line-segments
                     if fPd: Pp_ = layer0[param_name][0][1]  # Ppd
                     else:   Pp_ = layer0[param_name][0][0]  # Ppm
-                    derPp_ = []  # from comp_Pp of _Pp to overlapping Pps per param
-
                     for k, Pp in enumerate(Pp_[start_Pp_[j]:], start=start_Pp_[j]):  # check Pps of the other param for x overlap:
                         if (Pp.ix0 - 1 < (_Pp.ix0 + _Pp.iL) and (Pp.ix0 + Pp.iL) + 1 > _Pp.ix0):
 
@@ -175,72 +181,74 @@ def comp_overlaps(layer0, fPd):  # find Pps that overlap across 4 Pp_s, compute 
                             rolp = olpL / ((_Pp.iL + Pp.iL) / 2)  # mean of Ls
                             if rolp > ave_rolp:
                                 derPp = comp_Pp(_Pp, Pp, layer0)
-                                derPp_.append((derPp, _param_name, param_name)) # pack derPp bottom up
+                                # _param_name and param_name are for debug purpose 
+                                derPp_.append((derPp, rolp, _param_name, param_name))  # pack derPps bottom up
                         else:
                             start_Pp_[j] = k  # next Pp starting index for current param_name
                             break  # if current Pp doesn't overlap _Pp, the next one won't either, but next _Pp overlaps current Pp
 
-                    if derPp_:
-                        derPp__.append(derPp_)  # derPp_s from comp_Pp (_Pp, other param Pp_)
-            if derPp__:
-                derPp___.append(derPp__)  # derPp_s from comp_Pp (_Pp, other params)
-        if derPp___:
-            derPp____.append(derPp___)  # derPp_s from comp_Pp (param_Pp_, other params)
-    if derPp____:
-        form_PP_(PP_, derPp____)  # all unique derPp_s from comp_Pp(cross-params)
+                derPp__.append(derPp_)  # derPp_s from comp_Pp (_Pp, other param Pp_)
+            derPp___.append(derPp__)  # derPp_s from comp_Pp (_Pp, other params)
+        derPp____.append(derPp___)  # derPp_s from comp_Pp (param_Pp_, other params)
+    # derPps from all compared Pps, with discontinuity recorded in x0,L
+    PP_ = form_PP_(derPp____, fPd)  # all unique derPp_s from comp_Pp(cross-params)
 
     return PP_
 
 
-def form_PP_(PP_, derPp____):  # unpack derPp____ top down, pack matching derPps into PPs bottom-up
+def form_PP_(params_derPp____, fPd):  # Draft:
     '''
-    Draft: form PP from all overlapping derPps
+    unpack 4-layer derPp____: _names ( _Pp_ ( names ( Pp_ ))),
+    pack derPps with overlapping match: sum of concurrent mPps > ave_M * rolp, into PPs of PP_
     '''
-    rdn = {'L_': .25, 'I_': .5, 'D_': .25, 'M_': .5}
-    fPP = 0
-    PPm = PPd = CPP()  # initialize PPs
+    rdn = [.25,.5,.25,.5]  # {'L_': .25, 'I_': .5, 'D_': .25, 'M_': .5}
+    names = ['L_', 'I_', 'D_', 'M_']
+    Rolp = 0
+    PP_ = []
 
-    for _param, derPp___ in derPp____:  # from comp_Pp (across params)
-        for _Pp, derPp__ in derPp___:  # from comp_Pp (param_Pp_, other params)
-            for param, derPp_ in derPp__:  # from comp_Pp (_Pp, other params)
-                for Pp, derPp in derPp_:  # from comp_Pp (_Pp, other param' Pp_)
+    PP_derPp____=[]
+    for i, _param_derPp___ in enumerate( params_derPp____):  # derPp___ from comp_Pp (across params)
+        PP_derPp___=[]
+        for j, _Pp_derPp__ in enumerate( _param_derPp___):  # from comp_Pp (param_Pp_, other params)
+            PP_derPp__=[]
+            for k, param_derPp_ in enumerate( _Pp_derPp__):  # from comp_Pp (_Pp, other params)
+                PP_derPp_=[]
+                for (derPp, rolp, _name, name) in param_derPp_:  # from comp_Pp (_Pp, other param' Pp_)
 
-                    rdn = (rdn[_param] + rdn[param]) / 2  # mean rdn pof compared params
-                    if derPp.mPp * rdn > ave_M:
-                        PPm.accum_from(derPp); PPm.derPp_.append(derPp)
-                        fPP = 1
-                    if derPp.dPp * rdn > ave_D:
-                        PPd.accum_from(derPp); PPd.derPp_.append(derPp)
-                        fPP = 1
+                    # for debug purpose, to make sure the names are correct
+                    if names[i] != _name:
+                        raise ValueError("Wrong _name")
+                    if names[k] != name:
+                        raise ValueError("Wrong name")
+                        
+                    mean_rdn = (rdn[i] + rdn[k]) / 2  # of compared params
+                    if "PP_Dert" not in locals():
+                        PP_Dert = CPP()
+                    if fPd: derPp_val = derPp.dPp; ave = ave_D
+                    else:   derPp_val = derPp.mPp; ave = ave_M
 
-        # below ia not reviewed
+                    if derPp_val * mean_rdn > ave:
+                        Rolp += rolp
+                        PP_Dert.accum_from(derPp)
+                        # accumulation in actual PP is conditional on sum of concurrent mPps > ave_M * rolp over all loops, below
+                        PP_derPp_.append(derPp)
+                        PP_Dert.param_name_.append((names[i], names[k]))
+                    else:
+                        
+                        
+                '''
+                We need define inclusion into each higher layer of PP by the sum of concurrent mPps > ave_M * rolp,
+                over all lower layers?                                
+                '''
+                if PP_derPp_: PP_derPp__.append(PP_derPp_) 
+            if PP_derPp__: PP_derPp___.append(PP_derPp__)
+        if PP_derPp___: PP_derPp____.append(PP_derPp___)
+    if (PP_derPp____) and (PP_Dert.mPp > ave_M * Rolp): 
+        PP_Dert.derPp____= PP_derPp____
+        PP_.append(PP_Dert)
 
-        for derPp__ in derPp__:  # derPp__ = list of overlapping Pp's derPps for different param_names
-            for (derPp, _param_name, param_name) in derPp_: # derPp_ = list of overlapping Pp's derPps per param_name
-
-                # mean of match  and difference based on both compared params?
-                mPp = (derPp.mPp * rdn[_param_name] + derPp.mPp * rdn[param_name])/2
-                dPp = (derPp.dPp * rdn[_param_name] + derPp.dPp * rdn[param_name])/2
-
-                if mPp > ave_M and dPp > ave_D :  # ave is just a placeholder
-                    fPP = 1
-                    PP.accum_from(derPp)
-                    PP.derPp_.append(derPp)
-        if fPP: PP_.append(PP)
-'''
-We should get 4-layer nesting in derPp____: names ( _Pp_ ( names ( Pp_ ))), and form PP_ out of it.
-PP should combine all matching overlapping Pps, with multiple matches in each dimension.
-def form_PP_(PP_, derPp__):  # Draft: form PP from derPps formed from different overlapping Pps
-    for derPp_ in derPp__:
-        fPP = 0
-        PP = CPP() # initialize 1st PP
-        for derPp in derPp_:
-            if derPp.mPp > -ave_M*100 and derPp.dPp > -ave_D*100:
-                fPP = 1
-                PP.accum_from(derPp)
-                PP.derPp_.append(derPp)
-        if fPP: PP_.append(PP)
-'''
+    #  if PP_term: PP_.append(PP)
+    return PP_
 
 def comp_Pp(_Pp, Pp, layer0):
     '''
@@ -248,17 +256,17 @@ def comp_Pp(_Pp, Pp, layer0):
     '''
     mPp = dPp = 0
     layer1 = dict({'L':.0,'I':.0,'D':.0,'M':.0})
-    dist_coef = ave_rM * (1 + _Pp.negL / _Pp.L)  # average match projected at current distance
-
+    dist_coef = ave_rM * (1 + _Pp.negL / _Pp.L)
+    # average match projected at current distance, needs a review
     for param_name in layer1:
         if param_name == "I":
-            dist_ave = ave_inv * dist_coef
+            ave = ave_inv # * dist_coef
         else:
-            dist_ave = ave_min * dist_coef
+            ave = ave_min # * dist_coef
         param = getattr(_Pp, param_name)
         _param = getattr(Pp, param_name)
-        dert = comp_param(_param, param, [], dist_ave)
-        rdn = layer0[param_name+'_'][1] # index 1 =rdn
+        dert = comp_param(_param, param, [], ave)
+        rdn = layer0[param_name+'_'][1]  # index 1 =rdn
         mPp += dert.m * rdn
         dPp += dert.d * rdn
         layer1[param_name] = dert
@@ -453,3 +461,52 @@ def intra_Ppm_(Pp_, param_name, rdn, fPd):
 
             # add: ave_M + (Pp.M / len(Pp.P_)) / 2 * rdn: ave_M is average of local and global match
             # extended search needs to be restricted to ave_M-terminated derts
+
+
+def draw_PP_(image, frame_PP_):
+    # init every possible combinations
+    img_mparams = {'L_I_': np.zeros_like(image), 'L_D_': np.zeros_like(image),
+                   'L_M_': np.zeros_like(image), 'I_D_': np.zeros_like(image),
+                   'I_M_': np.zeros_like(image), 'D_M_': np.zeros_like(image)}
+
+    img_dparams = {'L_I_': np.zeros_like(image), 'L_D_': np.zeros_like(image),
+                   'L_M_': np.zeros_like(image), 'I_D_': np.zeros_like(image),
+                   'I_M_': np.zeros_like(image), 'D_M_': np.zeros_like(image)}
+
+    for y, (PPm_, PPd_) in enumerate(frame_PP_):  # draw each line
+        if PPm_ or PPd_:
+            for PPm, PPd in zip_longest(PPm_, PPd_,  fillvalue=[]):
+    
+                if PPm:
+                    draw_PP(img_mparams, PPm, y)
+                if PPd:
+                    draw_PP(img_dparams, PPd, y)
+    # plot diagram of each pair PPs
+    plt.figure()
+    for i, param in enumerate(img_mparams):
+        plt.subplot(2, 3, i + 1)
+        plt.imshow(img_mparams[param], vmin=0, vmax=255)
+        plt.title("pair = " + param + " m param")
+
+    plt.figure()
+    for i, param in enumerate(img_dparams):
+        plt.subplot(2, 3, i + 1)
+        plt.imshow(img_dparams[param], vmin=0, vmax=255)
+        plt.title("pair = " + param + " d param")
+
+
+def draw_PP(img_params, PP, y):
+
+    for (derPp___) in PP.derPp____:
+        for derPp__ in derPp___:
+            for (derPp_) in derPp__:
+                for derPp in derPp_:
+
+                    Pp = derPp.Pp
+                    _Pp = derPp._Pp
+
+                    _name, name = PP.param_name_.pop(0)
+                    
+                    # values draw
+                    img_params[_name + name][y, _Pp.ix0:_Pp.ix0 + _Pp.iL] += 32
+                    img_params[_name + name][y, Pp.ix0:Pp.ix0 + Pp.iL] += 32
