@@ -222,19 +222,18 @@ def form_PP_(params_derPp____, fPd):  # Draft:
                         raise ValueError("Wrong name")
                         
                     mean_rdn = (rdn[i] + rdn[k]) / 2  # of compared params
-                    if "PP_Dert" not in locals():
-                        PP_Dert = CPP()
+                    if "pre_PP" not in locals():
+                        pre_PP = CPP()
                     if fPd: derPp_val = derPp.dPp; ave = ave_D
                     else:   derPp_val = derPp.mPp; ave = ave_M
 
                     if derPp_val * mean_rdn > ave:
                         Rolp += rolp
-                        PP_Dert.accum_from(derPp)
-                        # accumulation in actual PP is conditional on sum of concurrent mPps > ave_M * rolp over all loops, below
+                        pre_PP.accum_from(derPp)
                         PP_derPp_.append(derPp)
-                        PP_Dert.param_name_.append((names[i], names[k]))
                     else:
-                        
+                        pre_PP=CPP()
+
                         
                 '''
                 We need define inclusion into each higher layer of PP by the sum of concurrent mPps > ave_M * rolp,
@@ -243,9 +242,9 @@ def form_PP_(params_derPp____, fPd):  # Draft:
                 if PP_derPp_: PP_derPp__.append(PP_derPp_) 
             if PP_derPp__: PP_derPp___.append(PP_derPp__)
         if PP_derPp___: PP_derPp____.append(PP_derPp___)
-    if (PP_derPp____) and (PP_Dert.mPp > ave_M * Rolp): 
-        PP_Dert.derPp____= PP_derPp____
-        PP_.append(PP_Dert)
+    if (PP_derPp____) and (pre_PP.mPp > ave_M * Rolp): 
+        pre_PP.derPp____= PP_derPp____
+        PP_.append(pre_PP)
 
     #  if PP_term: PP_.append(PP)
     return PP_
